@@ -61,3 +61,5 @@
 - [顶部与竖列布局、独立地图日夜和渐变时长](docs/DASHBOARD_LAYOUT_AND_INDEPENDENT_MAP_THEME.zh-CN.md)
 
 - [公开图标与私有参考资料边界](docs/PUBLIC_ICON_ASSET_BOUNDARY.zh-CN.md)
+
+- [六寸仪表视觉精修试版](docs/DASHBOARD_VISUAL_REFINEMENT.zh-CN.md)

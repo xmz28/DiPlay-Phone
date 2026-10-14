@@ -70,7 +70,7 @@ internal class FusionDashboardView(context: Context) : View(context) {
     private var green = Color.rgb(28, 233, 100)
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val artworkPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply { alpha = 255 }
-    private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val textPaint = android.text.TextPaint(Paint.ANTI_ALIAS_FLAG)
     private val regular = Typeface.create("sans-serif", Typeface.NORMAL)
     private val medium = Typeface.create("sans-serif-medium", Typeface.NORMAL)
     private val bold = Typeface.create("sans-serif", Typeface.BOLD)
@@ -79,6 +79,10 @@ internal class FusionDashboardView(context: Context) : View(context) {
     private var leftFade = LinearGradient(0f, 0f, 1030f, 0f,
         intArrayOf(Color.rgb(3, 10, 17), Color.argb(247, 3, 10, 17), Color.argb(185, 3, 10, 17), Color.TRANSPARENT),
         floatArrayOf(0f, .53f, .76f, 1f), Shader.TileMode.CLAMP)
+    private var gaugeFade: Shader? = null
+    private var footerFill: Shader? = null
+    private val speedArcShader = LinearGradient(76f, 666f, 602f, 140f,
+        Color.rgb(8, 137, 242), Color.rgb(42, 179, 255), Shader.TileMode.CLAMP)
     private var logicalHeight = 864f
     private var edgeFade = LinearGradient(0f, 0f, 0f, 864f,
         intArrayOf(Color.argb(100, 3, 10, 17), Color.TRANSPARENT, Color.TRANSPARENT, Color.argb(230, 3, 10, 17)),
@@ -124,9 +128,18 @@ internal class FusionDashboardView(context: Context) : View(context) {
     private fun rebuildBackgroundShaders() {
         val base = themed(Color.rgb(232, 239, 246), Color.rgb(3, 10, 17))
         val r = Color.red(base); val g = Color.green(base); val b = Color.blue(base)
-        leftFade = LinearGradient(0f, 0f, 1030f, 0f,
-            intArrayOf(Color.rgb(r, g, b), Color.argb(247, r, g, b), Color.argb(185, r, g, b), Color.TRANSPARENT),
-            floatArrayOf(0f, .53f, .76f, 1f), Shader.TileMode.CLAMP)
+        // Keep the texture's left boundary fully covered, then blend around the dial's contour.
+        leftFade = LinearGradient(0f, 0f, 760f, 0f,
+            intArrayOf(Color.rgb(r, g, b), Color.rgb(r, g, b), Color.argb(145, r, g, b), Color.argb(0, r, g, b)),
+            floatArrayOf(0f, 500f / 760f, .84f, 1f), Shader.TileMode.CLAMP)
+        gaugeFade = RadialGradient(0f, 0f, 1f,
+            intArrayOf(Color.rgb(r, g, b), Color.rgb(r, g, b), Color.argb(165, r, g, b), Color.argb(0, r, g, b)),
+            floatArrayOf(0f, .60f, .78f, 1f), Shader.TileMode.CLAMP).apply {
+            setLocalMatrix(Matrix().apply { setScale(540f, logicalHeight * .58f); postTranslate(380f, logicalHeight * .48f) })
+        }
+        footerFill = LinearGradient(0f, 722f, 0f, 850f,
+            themed(Color.argb(247, 250, 253, 255), Color.argb(245, 9, 20, 31)),
+            themed(Color.argb(247, 230, 238, 245), Color.argb(247, 4, 11, 18)), Shader.TileMode.CLAMP)
         // Sample a quintic smoothstep: flat slopes at both ends avoid a visible fade boundary.
         val stops = FloatArray(33) { it / 32f }
         fun fadeColors(increasing: Boolean) = IntArray(stops.size) { index ->
@@ -144,7 +157,11 @@ internal class FusionDashboardView(context: Context) : View(context) {
     override fun onDraw(canvas: Canvas) {
         canvas.save()
         canvas.scale(width / 1920f, width / 1920f)
+        paint.shader = null; paint.style = Paint.Style.FILL
+        paint.color = Color.WHITE
         paint.shader = leftFade; paint.style = Paint.Style.FILL
+        canvas.drawRect(0f, 0f, 1920f, logicalHeight, paint)
+        paint.shader = gaugeFade
         canvas.drawRect(0f, 0f, 1920f, logicalHeight, paint)
         paint.shader = edgeFade
         canvas.drawRect(0f, 0f, 1920f, logicalHeight, paint)
@@ -164,7 +181,11 @@ internal class FusionDashboardView(context: Context) : View(context) {
         paint.color = themed(Color.rgb(184, 201, 215), Color.rgb(17, 32, 44))
         rect.set(76f, 140f, 602f, 666f)
         canvas.drawArc(rect, 140f, 260f, false, paint)
-        paint.color = blue
+        paint.color = Color.WHITE; paint.shader = speedArcShader
+        canvas.drawArc(rect, 140f, 126f, false, paint)
+        paint.shader = null
+        paint.strokeWidth = 1.5f; paint.color = Color.argb(95, 85, 197, 255)
+        rect.set(86f, 150f, 592f, 656f)
         canvas.drawArc(rect, 140f, 126f, false, paint)
         paint.strokeWidth = 3f
         paint.color = Color.argb(90, 45, 169, 255)
@@ -193,7 +214,7 @@ internal class FusionDashboardView(context: Context) : View(context) {
 
         canvas.save()
         canvas.translate(0f, logicalHeight - 864f)
-        glass(canvas, 10f, 722f, 1910f, 850f, 52f)
+        glass(canvas, 10f, 722f, 1910f, 850f, 32f, footerFill)
         rect.set(53f, 750f, 125f, 822f)
         val cover = media.artwork?.takeUnless { it.isRecycled }
         if (cover != null) {
@@ -209,8 +230,8 @@ internal class FusionDashboardView(context: Context) : View(context) {
         }
         val song = media.info.title?.takeIf { it.isNotBlank() } ?: glance.song
         val artist = media.info.artist?.takeIf { it.isNotBlank() }
-        text(canvas, shorten(song ?: "打开 CarPlay", 10), 154f, 779f, 29f, white, medium)
-        text(canvas, shorten(artist ?: if (song != null) if (media.info.playing || glance.playing) "正在播放" else "已暂停" else "应用与音乐  ›", 13), 154f, 809f, 22f, muted)
+        text(canvas, fitLabel(song ?: "打开 CarPlay", 283f, 32f), 154f, 779f, 32f, white, medium)
+        text(canvas, fitLabel(artist ?: if (song != null) if (media.info.playing || glance.playing) "正在播放" else "已暂停" else "应用与音乐  ›", 283f, 28f, regular), 154f, 809f, 28f, muted)
         val duration = media.info.durationMillis ?: 0L
         if (duration > 0L) {
             paint.color = themed(Color.rgb(184, 201, 215), Color.rgb(34, 52, 68))
@@ -220,19 +241,19 @@ internal class FusionDashboardView(context: Context) : View(context) {
             canvas.drawRoundRect(rect, 2f, 2f, paint)
         }
         battery(canvas, 480f, 770f)
-        text(canvas, "电量", 565f, 777f, 23f, muted)
-        text(canvas, "${vehicle.battery}%", 565f, 811f, 34f, white, medium)
+        text(canvas, "电量", 565f, 775f, 28f, muted)
+        text(canvas, "${vehicle.battery}%", 565f, 814f, 40f, white, medium)
         line(canvas, 680f, 755f, 680f, 818f)
-        text(canvas, "电压", 711f, 777f, 23f, muted)
-        text(canvas, "${vehicle.voltage} V", 711f, 811f, 32f, white, medium)
-        text(canvas, "电流", 864f, 777f, 23f, muted)
-        text(canvas, "${vehicle.current} A", 864f, 811f, 32f, white, medium)
+        text(canvas, "电压", 711f, 775f, 28f, muted)
+        text(canvas, "${vehicle.voltage} V", 711f, 814f, 36f, white, medium)
+        text(canvas, "电流", 864f, 775f, 28f, muted)
+        text(canvas, "${vehicle.current} A", 864f, 814f, 36f, white, medium)
         line(canvas, 1020f, 755f, 1020f, 818f)
-        text(canvas, "续航", 1052f, 777f, 23f, muted)
-        text(canvas, "${vehicle.range} km", 1052f, 811f, 32f, white, medium)
+        text(canvas, "续航", 1052f, 775f, 28f, muted)
+        text(canvas, "${vehicle.range} km", 1052f, 814f, 40f, white, medium)
         line(canvas, 1225f, 755f, 1225f, 818f)
-        text(canvas, "里程", 1260f, 777f, 23f, muted)
-        text(canvas, "${vehicle.odometer} km", 1260f, 811f, 32f, white, medium)
+        text(canvas, "里程", 1260f, 775f, 28f, muted)
+        text(canvas, "${vehicle.odometer} km", 1260f, 814f, 36f, white, medium)
         themeIcon(canvas, 1560f, 773f)
         text(canvas, if (night) "夜间" else "日间", 1560f, 826f, 25f, muted, regular, Paint.Align.CENTER)
         paint.color = white; paint.style = Paint.Style.STROKE; paint.strokeWidth = 3f
@@ -263,13 +284,19 @@ internal class FusionDashboardView(context: Context) : View(context) {
         }
         c.drawText(value, x, y, textPaint)
     }
+    private fun fitLabel(value: String, maxWidth: Float, size: Float, font: Typeface = medium): String {
+        textPaint.textSize = size; textPaint.typeface = font
+        return android.text.TextUtils.ellipsize(value, textPaint, maxWidth, android.text.TextUtils.TruncateAt.END).toString()
+    }
     private fun shorten(value: String, max: Int) = if (value.length > max) value.take(max - 1) + "…" else value
-    private fun glass(c: Canvas, l: Float, t: Float, r: Float, b: Float, radius: Float) {
+    private fun glass(c: Canvas, l: Float, t: Float, r: Float, b: Float, radius: Float, surface: Shader? = null) {
         rect.set(l, t, r, b); paint.style = Paint.Style.FILL
         paint.color = themed(Color.argb(235, 248, 251, 255), Color.argb(225, 5, 14, 24))
+        if (surface != null) { paint.color = Color.WHITE; paint.shader = surface }
         c.drawRoundRect(rect, radius, radius, paint)
+        paint.shader = null
         paint.style = Paint.Style.STROKE; paint.strokeWidth = 1.5f
-        paint.color = themed(Color.argb(170, 164, 184, 204), Color.argb(115, 59, 81, 105))
+        paint.color = themed(Color.argb(120, 164, 184, 204), Color.argb(70, 59, 81, 105))
         c.drawRoundRect(rect, radius, radius, paint); paint.style = Paint.Style.FILL
     }
     private fun line(c: Canvas, x1: Float, y1: Float, x2: Float, y2: Float) {
@@ -281,6 +308,7 @@ internal class FusionDashboardView(context: Context) : View(context) {
         path.lineTo(x - 4, y - 8); path.lineTo(x + 21, y - 8); path.lineTo(x + 21, y + 8)
         path.lineTo(x - 4, y + 8); path.lineTo(x - 4, y + 20); path.close(); c.drawPath(path, paint)
     }
+    private val warningIndicators = setOf(DashboardIndicator.FAULT, DashboardIndicator.ABS, DashboardIndicator.TCS, DashboardIndicator.HDC, DashboardIndicator.RIDER_UNSEATED)
     private val secondRow = arrayOf(DashboardIndicator.FAULT, DashboardIndicator.ENERGY_RECOVERY,
         DashboardIndicator.SIDE_STAND, DashboardIndicator.SEAT, DashboardIndicator.ABS,
         DashboardIndicator.RIDER_UNSEATED, DashboardIndicator.HDC, DashboardIndicator.CRUISE,
@@ -316,12 +344,15 @@ internal class FusionDashboardView(context: Context) : View(context) {
         val capacity = ((logicalHeight - 280f) / 82f).toInt().coerceIn(1, secondRow.size)
         val step = 82f
         secondRow.forEachIndexed { index, id ->
-            statusIcon(c, id, 54f + (index / capacity) * 80f, 170f + (index % capacity) * step)
+            val active = indicators.signal(id).active
+            val warning = id in warningIndicators
+            if (active || indicators.demonstration || !warning)
+                statusIcon(c, id, 54f + (index / capacity) * 80f, 170f + (index % capacity) * step)
         }
     }
     private fun statusColor(id: DashboardIndicator): Int {
         val state = indicators.signal(id)
-        if (!state.active || (state.blinking && !blink)) return themed(Color.rgb(145, 160, 177), Color.rgb(70, 89, 112))
+        if (!state.active || (state.blinking && !blink)) return themed(Color.rgb(150, 164, 179), Color.rgb(52, 68, 86))
         return when (id) {
             DashboardIndicator.HIGH_BEAM, DashboardIndicator.VEHICLE_BLUETOOTH, DashboardIndicator.PHONE_BLUETOOTH -> blue
             DashboardIndicator.FAULT -> Color.rgb(244, 70, 75)
