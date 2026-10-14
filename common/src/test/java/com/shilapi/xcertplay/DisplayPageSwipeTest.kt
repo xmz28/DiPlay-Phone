@@ -45,9 +45,30 @@ class DisplayPageSwipeTest {
             val map = pane.getChildAt(0)
             val primary = pane.getChildAt(2).layoutParams as android.widget.FrameLayout.LayoutParams
             val home = pane.getChildAt(3).layoutParams as android.widget.FrameLayout.LayoutParams
-            assertTrue(map.layoutParams.width > 0 && map.layoutParams.height <= h)
+            assertTrue(map.layoutParams.width > 0)
+            assertEquals(h, map.layoutParams.height)
+            assertEquals(0, (map.layoutParams as android.widget.FrameLayout.LayoutParams).topMargin)
+            val transform = FloatArray(9)
+            (map as android.view.TextureView).getTransform(android.graphics.Matrix()).getValues(transform)
+            val displayedAspect = map.layoutParams.width * transform[android.graphics.Matrix.MSCALE_X] /
+                (h * transform[android.graphics.Matrix.MSCALE_Y])
+            assertEquals(MapMirrors.streamAspect.toFloat(), displayedAspect, .001f)
             assertTrue(primary.topMargin >= 0 && primary.topMargin + primary.height <= h)
             assertTrue(home.leftMargin + home.width <= w && primary.leftMargin + primary.width < home.leftMargin)
+            val theme = pane.getChildAt(4).layoutParams as android.widget.FrameLayout.LayoutParams
+            assertTrue(theme.leftMargin + theme.width <= home.leftMargin && theme.topMargin + theme.height <= h)
         }
+    }
+    @Test fun dayNightControlCallsHostAndAnnouncesNextMode() {
+        val context = org.robolectric.RuntimeEnvironment.getApplication()
+        var calls = 0
+        val pane = FusionDashboardPane(context, {}, {}, {}, { calls++ })
+        val button = pane.getChildAt(4)
+        pane.setNightMode(false)
+        assertEquals("切换到夜间模式", button.contentDescription)
+        button.performClick()
+        assertEquals(1, calls)
+        pane.setNightMode(true)
+        assertEquals("切换到日间模式", button.contentDescription)
     }
 }

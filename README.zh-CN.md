@@ -12,6 +12,7 @@
 
 - [环境配置、编译与本地研究入口](docs/RESEARCH.zh-CN.md)
 - [融合仪表功能与限制](docs/FUSION_DASHBOARD.zh-CN.md)
+- [日夜主题、地图覆盖与指示灯定义](docs/DASHBOARD_THEME_AND_INDICATORS.zh-CN.md)
 - [红米副屏地图实测记录](docs/CLUSTER_MAP_VERIFICATION.zh-CN.md)
 - [车辆仪表融合与后续接入方案](docs/YADEA_DISPLAY_PLAN.zh-CN.md)
 - [无线连接、握手与鉴权原理](docs/CARPLAY_WIRELESS_PROTOCOL.zh-CN.md)

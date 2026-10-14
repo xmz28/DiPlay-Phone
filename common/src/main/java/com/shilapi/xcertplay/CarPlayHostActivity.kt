@@ -401,6 +401,7 @@ class CarPlayHostActivity : ComponentActivity() {
             initialNight = darkMode,
         ) { night ->
             darkMode = night
+            fusionPane?.setNightMode(night)
             applyClusterTurnOverlay()
             appendLog("CarPlay switched to ${if (night) "night" else "day"} mode")
             logThemeState(nightModeDiagnosticSource, resources.configuration)
@@ -1140,9 +1141,9 @@ class CarPlayHostActivity : ComponentActivity() {
         }
         root.addView(video, FrameLayout.LayoutParams(-1, -1))
         root.addView(gestureLayer, FrameLayout.LayoutParams(-1, -1))
-        val fusion = FusionDashboardPane(this, { showDisplayPage(false) }, { showDiPlayHome() }) {
+        val fusion = FusionDashboardPane(this, { showDisplayPage(false) }, { showDiPlayHome() }, {
             if (waitingForFusion) showDisplayPage(true, waitForFrame = false)
-        }.apply { alpha = .001f }
+        }, { toggleFusionTheme() }).apply { alpha = .001f; setNightMode(darkMode) }
         fusionPane = fusion
         root.addView(fusion, FrameLayout.LayoutParams(-1, -1))
         // Measure the preparation content naturally, then fit it inside the safe viewport.
@@ -4011,6 +4012,14 @@ class CarPlayHostActivity : ComponentActivity() {
         controller?.sendTouch(emptyList())
         startActivity(Intent(this, DiPlayActivity::class.java)
             .putExtra("page", page).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
+    }
+
+    private fun toggleFusionTheme() {
+        carPlayNightMode = if (darkMode) CarPlayNightMode.DAY else CarPlayNightMode.NIGHT
+        AirPlayPersistence.saveCarPlayNightMode(this, carPlayNightMode)
+        nightModeController.configure(carPlayNightMode, nightModeOrNull(resources.configuration.uiMode) ?: false,
+            ambientLightThreshold, ambientDelaySeconds)
+        fusionPane?.setNightMode(darkMode)
     }
 
     private fun openSettingsMenu() = showDiPlayHome("settings")
