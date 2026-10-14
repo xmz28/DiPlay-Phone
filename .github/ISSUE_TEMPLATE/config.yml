@@ -1,5 +1,5 @@
 blank_issues_enabled: true
 contact_links:
-  - name: Installation and connection help
-    url: https://github.com/shihabal3amri/DiPlay/blob/main/docs/INSTALL.md
-    about: Read setup and troubleshooting steps first.
+  - name: 手机适配版安装与连接说明
+    url: https://github.com/ZedingZhang/DiPlay-Phone/blob/main/README.md
+    about: 查看当前发布包、手机连接方式和已知问题。

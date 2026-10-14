@@ -38,7 +38,7 @@
 ## 验证结果
 
 - 13 项 CarPlayHostSizeSettingTest、3 项 DisplayPageSwipeTest 通过，无失败或错误。
-- APK 编译、认证资源校验、覆盖安装通过，设备 serial 为 2064eb6d。
+- APK 编译、认证资源校验、覆盖安装通过，设备 serial 为 <DEVICE_SERIAL>。
 - 实机截图确认 CarPlay 应用列表显示“仪表”速度表图标，点击后进入融合页；音乐区域返回主屏，前台均为 CarPlayHostActivity，应用进程保持。
 - 用户实机确认双指左滑、右滑两个方向都正常；日志记录连续 main/fusion 切页。
 - 红米切页期间同一副屏镜像解码线程继续输出，未因页面选择重新建立副屏流。

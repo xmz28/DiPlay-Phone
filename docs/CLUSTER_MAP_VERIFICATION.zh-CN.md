@@ -1,6 +1,6 @@
 # 红米 K30 副屏地图实测
 
-2026-10-13，设备 Redmi K30 5G / Android 13，ADB serial `2064eb6d`。
+2026-10-13，设备 Redmi K30 5G / Android 13，ADB serial `<DEVICE_SERIAL>`。
 
 ## 已验证
 
@@ -24,5 +24,5 @@ APK SHA256：`8EADCA3D4B3A9F1C5066E112C0D9857C21F455BF30C469A1546BA07B2B850AE2`�
 ADB 可从主入口打开验证页（非导出的测试 Activity 无法由外部直接启动）：
 
 ```powershell
-adb -s 2064eb6d shell am start -f 0x10020000 -n com.shihab.diplay.hudtest/com.shilapi.xcertplay.DiPlayActivity --ez cluster_test true
+adb -s <DEVICE_SERIAL> shell am start -f 0x10020000 -n com.shihab.diplay.hudtest/com.shilapi.xcertplay.DiPlayActivity --ez cluster_test true
 ```

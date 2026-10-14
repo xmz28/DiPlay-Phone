@@ -17,11 +17,11 @@
 
 ## 文件与设备
 
-- 源码根目录：`C:\Users\10145294\AndroidStudioProjects\DiPlay-Phone`，Android Studio 应打开此目录。
+- 源码根目录：`C:\Users\<USER>\AndroidStudioProjects\DiPlay-Phone`，Android Studio 应打开此目录。
 - 手机安装包备份：同级支持目录 `DiPlay-local-support\backups\DiPlay-Phone-original.apk`。
 - 原版 APK SHA-256：`f42ace8b25e64b63adbe54aa67c8249b8fddb83930d6dc2ec5606a5e9e70bd25`。
-- 认证资源：`C:\Users\10145294\DiPlay-runtime-assets\offline-mfi`，包含 `identity.pk8`、`certificate.p7b`。
-- 研究设备：Redmi K30 5G / Android 13，ADB 序列号 `2064eb6d`；iPhone 15 Pro / iOS 26.7。
+- 认证资源：`C:\Users\<USER>\DiPlay-runtime-assets\offline-mfi`，包含 `identity.pk8`、`certificate.p7b`。
+- 研究设备：Redmi K30 5G / Android 13，ADB 序列号 `<DEVICE_SERIAL>`；iPhone 15 Pro / iOS 26.7。
 - 用户已验证发布 APK 有线、无线连接成功，并确认基线自编译版与原版功能一致、可以正常运行。
 
 ## 本次验证结果（2026-10-13）
