@@ -234,7 +234,8 @@ class DiPlayActivity : ComponentActivity() {
                 return
             }
         }
-        startActivity(Intent(this, FusionDashboardActivity::class.java))
+        startActivity(Intent(this, CarPlayHostActivity::class.java).putExtra("display_page", "fusion")
+            .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
     }
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putString("page", page)
@@ -376,7 +377,8 @@ class DiPlayActivity : ComponentActivity() {
     }
 
     private fun home(content: LinearLayout) {
-        content.addView(button("融合仪表 · 演示预览", false) {
+        content.addView(button("CarPlay 主屏", false) { openProjection() })
+        content.addView(button("融合仪表 · 演示", false) {
             openFusionDashboard()
         })
         if (isCompactLayout) {
@@ -2528,7 +2530,7 @@ class DiPlayActivity : ComponentActivity() {
         else open()
     }
     private fun openProjection() {
-        startActivity(Intent(this, CarPlayHostActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
+        startActivity(Intent(this, CarPlayHostActivity::class.java).putExtra("display_page", "main").addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
     }
     private fun choosePhone() {
         if (Build.VERSION.SDK_INT >= 31 && checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {

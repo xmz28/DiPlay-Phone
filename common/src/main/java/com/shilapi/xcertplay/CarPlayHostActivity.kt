@@ -282,6 +282,34 @@ class CarPlayHostActivity : ComponentActivity() {
     private var sink: AndroidMediaSink? = null
     private var controller: CarPlayController? = null
     private var currentSurface: Surface? = null
+    private var fusionPane: FusionDashboardPane? = null
+    private var fusionSelected = false
+    private var pageAnimating = false
+    private var waitingForFusion = false
+    private val pageSwipe by lazy { DisplayPageSwipe(resources.displayMetrics.density) { showDisplayPage(it) } }
+    private val fusionWaitTimeout = Runnable { if (waitingForFusion) { waitingForFusion = false; showDisplayPage(true, waitForFrame = false) } }
+
+    private fun showDisplayPage(fusion: Boolean, waitForFrame: Boolean = true) {
+        val pane = fusionPane ?: return
+        if (pageAnimating || fusion == fusionSelected) return
+        controller?.sendTouch(emptyList())
+        if (fusion && waitForFrame && MapMirrors.streamActive && !pane.ready) {
+            waitingForFusion = true
+            mainHandler.removeCallbacks(fusionWaitTimeout)
+            mainHandler.postDelayed(fusionWaitTimeout, 1000)
+            return
+        }
+        waitingForFusion = false; mainHandler.removeCallbacks(fusionWaitTimeout)
+        fusionSelected = fusion; pageAnimating = true
+        connectionPanel?.visibility = if (!fusion && activeScreenStreamTypes.isEmpty()) View.VISIBLE else View.GONE
+        pane.pageActive = fusion
+        pane.translationX = if (fusion) -pane.width * .12f else 0f
+        pane.animate().translationX(if (fusion) 0f else -pane.width * .12f)
+            .alpha(if (fusion) 1f else .001f).setDuration(240).withEndAction { pageAnimating = false }.start()
+        videoView?.animate()?.translationX(if (fusion) pane.width * .12f else 0f)
+            ?.alpha(if (fusion) .001f else 1f)?.setDuration(240)?.start()
+        Log.i(TAG, "display page=${if (fusion) "fusion" else "main"}; session and surfaces retained")
+    }
     private var currentSurfaceTexture: SurfaceTexture? = null
     private var clusterPresentation: ClusterMapPresentation? = null
     private var clusterSurface: Surface? = null
@@ -467,6 +495,7 @@ class CarPlayHostActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        savedInstanceState?.getString("display_page")?.let { intent.putExtra("display_page", it) }
         restoreCarPlayOrientation(savedInstanceState)
         NavigationWidgetUpdater.attach(applicationContext)
         CenterMapOverlay.requestShow = ::showCenterMap
@@ -664,6 +693,7 @@ class CarPlayHostActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        intent.getStringExtra("display_page")?.let { showDisplayPage(it == "fusion") }
         if (isIphoneUsbAttachment(intent) && wirelessEnabled) {
             shutdown(false, "switching to USB") {
                 AirPlayPersistence.saveWirelessEnabled(this, false)
@@ -962,6 +992,7 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
+        outState.putString("display_page", if (fusionSelected) "fusion" else "main")
         outState.putBoolean("carplay_night_active", darkMode)
         lockedCarPlayOrientation?.let { outState.putInt(STATE_CARPLAY_ORIENTATION, it) }
         lockedCarPlayRotation?.let { outState.putInt(STATE_CARPLAY_ROTATION, it) }
@@ -1061,6 +1092,8 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        mainHandler.removeCallbacks(fusionWaitTimeout)
+        fusionPane?.animate()?.cancel()
         nightModeController.pause()
         pictureBinding?.close()
         pictureBinding = null
@@ -1107,6 +1140,11 @@ class CarPlayHostActivity : ComponentActivity() {
         }
         root.addView(video, FrameLayout.LayoutParams(-1, -1))
         root.addView(gestureLayer, FrameLayout.LayoutParams(-1, -1))
+        val fusion = FusionDashboardPane(this, { showDisplayPage(false) }, { showDiPlayHome() }) {
+            if (waitingForFusion) showDisplayPage(true, waitForFrame = false)
+        }.apply { alpha = .001f }
+        fusionPane = fusion
+        root.addView(fusion, FrameLayout.LayoutParams(-1, -1))
         // Measure the preparation content naturally, then fit it inside the safe viewport.
         val viewport = object : FrameLayout(this) {
             override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -1233,6 +1271,7 @@ class CarPlayHostActivity : ComponentActivity() {
         settingsGestureHint = gestureHint
         stageStatusView = stage
         connectionPanel = viewport
+        root.post { if (intent.getStringExtra("display_page") == "fusion") showDisplayPage(true) }
         updateDebugOverlays()
         return root
     }
@@ -3251,14 +3290,12 @@ class CarPlayHostActivity : ComponentActivity() {
         paint.color = Color.rgb(35, 112, 225)
         canvas.drawRoundRect(0f, 0f, 192f, 192f, 38f, 38f, paint)
         paint.color = Color.WHITE
-        val house = android.graphics.Path().apply {
-            moveTo(35f, 91f); lineTo(96f, 40f); lineTo(157f, 91f)
-            lineTo(145f, 105f); lineTo(135f, 97f); lineTo(135f, 151f)
-            lineTo(108f, 151f); lineTo(108f, 117f); lineTo(84f, 117f)
-            lineTo(84f, 151f); lineTo(57f, 151f); lineTo(57f, 97f)
-            lineTo(47f, 105f); close()
-        }
-        canvas.drawPath(house, paint)
+        paint.style = android.graphics.Paint.Style.STROKE; paint.strokeWidth = 10f
+        paint.strokeCap = android.graphics.Paint.Cap.ROUND
+        canvas.drawArc(android.graphics.RectF(36f, 42f, 156f, 162f), 145f, 250f, false, paint)
+        canvas.drawLine(96f, 105f, 128f, 68f, paint)
+        paint.style = android.graphics.Paint.Style.FILL
+        canvas.drawCircle(96f, 105f, 11f, paint)
         return java.io.ByteArrayOutputStream().use { output ->
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)
             bitmap.recycle()
@@ -4123,7 +4160,8 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun onHostTouch(view: View, event: MotionEvent): Boolean {
-        if (menuOpen) return true
+        if (pageAnimating || menuOpen) return true
+        if (pageSwipe.handle(event, false)) return true
 
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
@@ -4132,14 +4170,28 @@ class CarPlayHostActivity : ComponentActivity() {
             }
             MotionEvent.ACTION_POINTER_DOWN -> {
                 if (event.pointerCount == gestureFingerCount && !gestureSequenceActive) {
-                    gestureSequenceActive = true
                     gestureTracking = true
                     gestureStartX = pointerCentroid(event, horizontal = true)
                     gestureStartY = pointerCentroid(event, horizontal = false)
-                    controller?.sendTouch(emptyList())
-                    appendLog("Settings swipe tracking started; fingers=$gestureFingerCount")
-                    return true
+                    if (gestureFingerCount != 2) {
+                        gestureSequenceActive = true
+                        controller?.sendTouch(emptyList())
+                        appendLog("Settings swipe tracking started; fingers=$gestureFingerCount")
+                        return true
+                    }
                 }
+            }
+        }
+
+        // With two fingers, wait for a vertical commitment; do not steal a pinch at pointer-down.
+        if (gestureFingerCount == 2 && gestureTracking && event.pointerCount == 2 && event.actionMasked == MotionEvent.ACTION_MOVE) {
+            val dx = Math.abs(pointerCentroid(event, horizontal = true) - gestureStartX)
+            val dy = pointerCentroid(event, horizontal = false) - gestureStartY
+            if (dy >= dp(SETTINGS_SWIPE_DISTANCE_DP) && dy >= dx * SETTINGS_SWIPE_DIRECTION_RATIO) {
+                gestureTracking = false
+                controller?.sendTouch(emptyList())
+                openSettingsMenu()
+                return true
             }
         }
 
@@ -4248,7 +4300,7 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun updateDebugOverlays() {
         statusScrollView?.visibility = View.GONE
-        connectionPanel?.visibility = if (activeScreenStreamTypes.isEmpty()) View.VISIBLE else View.GONE
+        connectionPanel?.visibility = if (!fusionSelected && activeScreenStreamTypes.isEmpty()) View.VISIBLE else View.GONE
     }
 
     private fun friendlyStage(message: String): String = when {

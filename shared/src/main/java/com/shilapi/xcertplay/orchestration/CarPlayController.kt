@@ -309,13 +309,13 @@ class CarPlayController(
             uiListener?.onDeviceInfo(session, info)
         }
 
-        // The native OEM tile returns to DiPlay without tearing down the session.
+        // The OEM instrument tile selects the local dashboard in the existing display host.
         override fun onHostUiRequested(session: AirPlaySession) {
-            debugLog("CarPlay requested the host UI; opening DiPlay home")
+            debugLog("CarPlay requested the host UI; opening instrument dashboard")
             runCatching {
                 appContext.startActivity(
-                    Intent().setClassName(appContext.packageName, "com.shilapi.xcertplay.DiPlayActivity")
-                        .putExtra("page", "home")
+                    Intent().setClassName(appContext.packageName, "com.shilapi.xcertplay.CarPlayHostActivity")
+                        .putExtra("display_page", "fusion")
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT),
                 )
             }.onFailure { debugLog("Car home screen could not open: ${it.javaClass.simpleName}") }

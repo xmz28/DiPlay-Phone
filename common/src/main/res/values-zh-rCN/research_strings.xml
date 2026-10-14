@@ -1,4 +1,4 @@
 <resources>
-    <string name="native_home_title">CarPlay 原生 Home 图标</string>
-    <string name="native_home_hint">在 CarPlay 应用列表显示 Home。点击返回 DiPlay，保留后台连接。</string>
+    <string name="native_home_title">CarPlay 原生仪表图标</string>
+    <string name="native_home_hint">在 CarPlay 应用列表显示仪表入口。点击进入融合仪表，保留连接。名称可自定义。</string>
 </resources>

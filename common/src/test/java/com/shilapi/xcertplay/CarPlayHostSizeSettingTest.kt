@@ -128,15 +128,15 @@ class CarPlayHostSizeSettingTest {
     @Test fun xiaomiPhoneAdvertisesNativeHomeWithAPngIcon() {
         device("Xiaomi", "Xiaomi", "Xiaomi/umi/umi:11/RKQ1.200826.002/test-keys")
         select(CarPlaySize.MEDIUM)
-        assertEquals("Home", AirPlayPersistence.loadOemLabel(activity))
+        assertEquals("仪表", AirPlayPersistence.loadOemLabel(activity))
         val config = config()
-        assertEquals("Home", config.oemLabel)
+        assertEquals("仪表", config.oemLabel)
         assertEquals(192, config.icons.single().widthPixels)
         assertTrue(config.icons.single().data.take(8).toByteArray().contentEquals(
             byteArrayOf(0x89.toByte(), 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)))
         val info = AirPlayInfoPlist.build(config)
         assertEquals(true, info["oemIconVisible"])
-        assertEquals("Home", info["oemIconLabel"])
+        assertEquals("仪表", info["oemIconLabel"])
         assertTrue(info.containsKey("oemIcons"))
     }
 
@@ -181,6 +181,12 @@ class CarPlayHostSizeSettingTest {
         ShadowBuild.setManufacturer(manufacturer)
         ShadowBuild.setBrand(brand)
         ShadowBuild.setFingerprint(fingerprint)
+    }
+
+    @Test fun fullHdAndTwoToOneCanvasKeepRequestedDimensions() {
+        select(CarPlaySize.MEDIUM)
+        assertCanvas(config(1920, 1080).main, 1920 to 1080)
+        assertCanvas(config(960, 480).main, 960 to 480)
     }
 
     private fun select(size: CarPlaySize, resolutionPercent: Int = 100) {

@@ -35,7 +35,8 @@ internal class FusionDashboardView(context: Context) : View(context) {
     private val leftFade = LinearGradient(0f, 0f, 1030f, 0f,
         intArrayOf(Color.rgb(3, 10, 17), Color.argb(247, 3, 10, 17), Color.argb(185, 3, 10, 17), Color.TRANSPARENT),
         floatArrayOf(0f, .53f, .76f, 1f), Shader.TileMode.CLAMP)
-    private val edgeFade = LinearGradient(0f, 0f, 0f, 864f,
+    private var logicalHeight = 864f
+    private var edgeFade = LinearGradient(0f, 0f, 0f, 864f,
         intArrayOf(Color.argb(100, 3, 10, 17), Color.TRANSPARENT, Color.TRANSPARENT, Color.argb(230, 3, 10, 17)),
         floatArrayOf(0f, .20f, .70f, 1f), Shader.TileMode.CLAMP)
     private var glyphType: Int? = null
@@ -67,13 +68,21 @@ internal class FusionDashboardView(context: Context) : View(context) {
         invalidate()
     }
 
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        logicalHeight = if (w > 0) h * 1920f / w else 864f
+        edgeFade = LinearGradient(0f, 0f, 0f, logicalHeight,
+            intArrayOf(Color.argb(100, 3, 10, 17), Color.TRANSPARENT, Color.TRANSPARENT, Color.argb(230, 3, 10, 17)),
+            floatArrayOf(0f, .20f, .70f, 1f), Shader.TileMode.CLAMP)
+    }
+
     override fun onDraw(canvas: Canvas) {
         canvas.save()
-        canvas.scale(width / 1920f, height / 864f)
+        canvas.scale(width / 1920f, width / 1920f)
         paint.shader = leftFade; paint.style = Paint.Style.FILL
-        canvas.drawRect(0f, 0f, 1920f, 864f, paint)
+        canvas.drawRect(0f, 0f, 1920f, logicalHeight, paint)
         paint.shader = edgeFade
-        canvas.drawRect(0f, 0f, 1920f, 864f, paint)
+        canvas.drawRect(0f, 0f, 1920f, logicalHeight, paint)
         paint.shader = null
 
         glass(canvas, 12f, 8f, 720f, 90f, 38f)
@@ -84,6 +93,8 @@ internal class FusionDashboardView(context: Context) : View(context) {
         glass(canvas, 540f, 27f, 700f, 71f, 22f)
         text(canvas, "车辆数据演示", 620f, 56f, 21f, muted, regular, Paint.Align.CENTER)
 
+        canvas.save()
+        canvas.translate(0f, (logicalHeight - 864f) / 2)
         paint.style = Paint.Style.STROKE; paint.strokeWidth = 16f; paint.strokeCap = Paint.Cap.ROUND
         paint.color = Color.rgb(17, 32, 44)
         rect.set(76f, 140f, 602f, 666f)
@@ -100,6 +111,7 @@ internal class FusionDashboardView(context: Context) : View(context) {
         line(canvas, 155f, 502f, 523f, 502f)
         text(canvas, vehicle.gear, 339f, 577f, 68f, white, medium, Paint.Align.CENTER)
         text(canvas, "${vehicle.power} kW", 339f, 643f, 42f, white, regular, Paint.Align.CENTER)
+        canvas.restore()
 
         glass(canvas, 1030f, 8f, 1860f, 109f, 48f)
         if (glance.maneuverType != null) {
@@ -113,10 +125,12 @@ internal class FusionDashboardView(context: Context) : View(context) {
             text(canvas, if (glance.connected) "在 iPhone 上开始导航" else "连接 iPhone 后显示实时地图", 1070f, 87f, 24f, muted)
         }
         if (!mapActive) {
-            text(canvas, "地图连接中", 1390f, 391f, 42f, white, medium, Paint.Align.CENTER)
-            text(canvas, "请连接 DiPlay 并启用副屏地图", 1390f, 437f, 26f, muted, regular, Paint.Align.CENTER)
+            text(canvas, "地图连接中", 1390f, logicalHeight / 2 - 20f, 42f, white, medium, Paint.Align.CENTER)
+            text(canvas, "请连接 DiPlay 并启用副屏地图", 1390f, logicalHeight / 2 + 26f, 26f, muted, regular, Paint.Align.CENTER)
         }
 
+        canvas.save()
+        canvas.translate(0f, logicalHeight - 864f)
         glass(canvas, 10f, 722f, 1910f, 850f, 52f)
         paint.color = Color.rgb(245, 44, 112)
         rect.set(53f, 753f, 125f, 823f); canvas.drawRoundRect(rect, 19f, 19f, paint)
@@ -135,7 +149,8 @@ internal class FusionDashboardView(context: Context) : View(context) {
         text(canvas, vehicle.odometer, 1329f, 798f, 40f, white, medium)
         text(canvas, "km", 1449f, 797f, 27f, muted)
         house(canvas, 1797f, 773f)
-        text(canvas, "Home", 1797f, 826f, 25f, muted, regular, Paint.Align.CENTER)
+        text(canvas, "主页", 1797f, 826f, 25f, muted, regular, Paint.Align.CENTER)
+        canvas.restore()
         canvas.restore()
     }
 

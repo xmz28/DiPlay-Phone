@@ -1,5 +1,7 @@
 # 融合仪表演示
 
+2026-10-14 更新：主副屏现共用 CarPlayHostActivity；FusionDashboardPane 保持地图视图挂载。主页增加明确的两个页面入口，CarPlay OEM 图标改为“仪表”，双指横滑及过渡动画已实机验证。速度环改为等比例绘制，1920×1080、960×480 的布局与主屏配置测试通过。见[切换与分辨率记录](DISPLAY_SWITCHING.zh-CN.md)。下面保留首版功能与验证信息；旧 FusionDashboardActivity 现仅为兼容跳转入口。
+
 按照选定概念图实现普通 Android Activity：真实 CarPlay 仪表地图 → 本地透明仪表前景 → 可访问的本地按钮。地图由 MediaCodec 直接解码到 TextureView，未使用截屏、JPEG、悬浮窗或 root。
 
 入口：DiPlay 主界面“融合仪表 · 演示预览”。首次打开会启用虚拟副屏地图；已有会话需要先重新连接，然后再次打开预览。未连接时保留演示仪表并显示地图连接提示。
