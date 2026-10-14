@@ -79,8 +79,8 @@ class DisplayPageSwipeTest {
         view.setNightMode(true, animate = true)
         assertEquals(0f, view.themeFraction, .001f)
         val animation = org.robolectric.util.ReflectionHelpers.getField<android.animation.ValueAnimator>(view, "themeAnimator")
-        assertEquals(1500L, animation.duration)
-        animation.currentPlayTime = 750
+        assertEquals(1000L, animation.duration)
+        animation.currentPlayTime = 500
         val midpoint = view.themeFraction
         assertTrue(midpoint > .1f && midpoint < .9f)
         view.setNightMode(false, animate = true)

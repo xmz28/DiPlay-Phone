@@ -1,6 +1,6 @@
 package com.shilapi.xcertplay
 
-/** Names mirror MyApplication's dashboard status fields; no CAN/BLE dependency. */
+/** Dashboard status definitions for local indicator rendering; no CAN/BLE dependency. */
 enum class DashboardIndicator(val label: String) {
     LEFT_TURN("左转向灯"), RIGHT_TURN("右转向灯"), HIGH_BEAM("远光灯"), LOW_BEAM("近光灯"),
     POSITION_LIGHT("位置灯"), VEHICLE_BLUETOOTH("车辆蓝牙"), PHONE_BLUETOOTH("手机蓝牙"),

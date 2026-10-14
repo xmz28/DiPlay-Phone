@@ -39,3 +39,9 @@ release-signing.properties
 *.key
 *.apk
 *.aab
+
+# Private reference icons and original-vs-local comparison sheets stay outside this repository.
+/docs/indicator-review/
+/docs/INDICATOR_GLYPH_REVIEW.zh-CN.md
+**/hmi20_*.png
+**/yadea_import_image_*.png

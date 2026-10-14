@@ -21,6 +21,8 @@ internal class FusionDashboardView(context: Context) : View(context) {
     private val vehicle = VehiclePreview()
     private var indicators = DemoDashboardIndicators.snapshot()
     private var night = true
+    private var mapNight = true
+    fun setMapNightMode(value: Boolean) { mapNight = value; invalidate() }
     internal var themeFraction = 1f
         private set
     private var themeAnimator: ValueAnimator? = null
@@ -31,9 +33,9 @@ internal class FusionDashboardView(context: Context) : View(context) {
         night = value
         themeAnimator?.cancel()
         val target = if (value) 1f else 0f
-        if (!animate) { themeFraction = target; applyPalette(); return }
+        if (!animate || FusionThemeSettings.duration(context) == 0) { themeFraction = target; applyPalette(); return }
         themeAnimator = ValueAnimator.ofFloat(themeFraction, target).apply {
-            duration = 1500L
+            duration = FusionThemeSettings.duration(context).toLong()
             interpolator = AccelerateDecelerateInterpolator()
             addUpdateListener { themeFraction = it.animatedValue as Float; applyPalette() }
             start()
@@ -80,7 +82,11 @@ internal class FusionDashboardView(context: Context) : View(context) {
     private var logicalHeight = 864f
     private var edgeFade = LinearGradient(0f, 0f, 0f, 864f,
         intArrayOf(Color.argb(100, 3, 10, 17), Color.TRANSPARENT, Color.TRANSPARENT, Color.argb(230, 3, 10, 17)),
-        floatArrayOf(0f, .20f, .70f, 1f), Shader.TileMode.CLAMP)
+        floatArrayOf(0f, .20f * 2f / 3f, .70f, 1f), Shader.TileMode.CLAMP)
+    private val topFadeSize = 140f * 2f / 3f
+    private val rightFadeSize = 170f * 2f / 3f
+    private var mapTopFade: Shader? = null
+    private var mapRightFade: Shader? = null
     private var glyphType: Int? = null
     private var glyph: android.graphics.drawable.Drawable? = null
 
@@ -121,9 +127,18 @@ internal class FusionDashboardView(context: Context) : View(context) {
         leftFade = LinearGradient(0f, 0f, 1030f, 0f,
             intArrayOf(Color.rgb(r, g, b), Color.argb(247, r, g, b), Color.argb(185, r, g, b), Color.TRANSPARENT),
             floatArrayOf(0f, .53f, .76f, 1f), Shader.TileMode.CLAMP)
+        // Sample a quintic smoothstep: flat slopes at both ends avoid a visible fade boundary.
+        val stops = FloatArray(33) { it / 32f }
+        fun fadeColors(increasing: Boolean) = IntArray(stops.size) { index ->
+            val t = stops[index]
+            val smooth = t * t * t * (t * (t * 6f - 15f) + 10f)
+            Color.argb((255f * if (increasing) smooth else 1f - smooth).toInt().coerceIn(0, 255), r, g, b)
+        }
+        mapTopFade = LinearGradient(0f, 0f, 0f, topFadeSize, fadeColors(false), stops, Shader.TileMode.CLAMP)
+        mapRightFade = LinearGradient(1920f - rightFadeSize, 0f, 1920f, 0f, fadeColors(true), stops, Shader.TileMode.CLAMP)
         edgeFade = LinearGradient(0f, 0f, 0f, logicalHeight,
             intArrayOf(Color.argb(100, r, g, b), Color.TRANSPARENT, Color.TRANSPARENT, Color.argb(230, r, g, b)),
-            floatArrayOf(0f, .20f, .70f, 1f), Shader.TileMode.CLAMP)
+            floatArrayOf(0f, .20f * 2f / 3f, .70f, 1f), Shader.TileMode.CLAMP)
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -133,6 +148,10 @@ internal class FusionDashboardView(context: Context) : View(context) {
         canvas.drawRect(0f, 0f, 1920f, logicalHeight, paint)
         paint.shader = edgeFade
         canvas.drawRect(0f, 0f, 1920f, logicalHeight, paint)
+        paint.shader = mapTopFade
+        canvas.drawRect(500f, 0f, 1920f, topFadeSize, paint)
+        paint.shader = mapRightFade
+        canvas.drawRect(1920f - rightFadeSize, 0f, 1920f, logicalHeight, paint)
         paint.shader = null
 
         drawIndicators(canvas)
@@ -169,7 +188,7 @@ internal class FusionDashboardView(context: Context) : View(context) {
         }
         if (!mapActive) {
             text(canvas, "地图连接中", 1390f, logicalHeight / 2 - 20f, 42f, white, medium, Paint.Align.CENTER)
-            text(canvas, "请连接 DiPlay 并启用副屏地图", 1390f, logicalHeight / 2 + 26f, 26f, muted, regular, Paint.Align.CENTER)
+            text(canvas, "请连接 CarPlay 并启用副屏地图", 1390f, logicalHeight / 2 + 26f, 26f, muted, regular, Paint.Align.CENTER)
         }
 
         canvas.save()
@@ -214,8 +233,14 @@ internal class FusionDashboardView(context: Context) : View(context) {
         line(canvas, 1225f, 755f, 1225f, 818f)
         text(canvas, "里程", 1260f, 777f, 23f, muted)
         text(canvas, "${vehicle.odometer} km", 1260f, 811f, 32f, white, medium)
-        themeIcon(canvas, 1640f, 773f)
-        text(canvas, if (night) "夜间" else "日间", 1640f, 826f, 25f, muted, regular, Paint.Align.CENTER)
+        themeIcon(canvas, 1560f, 773f)
+        text(canvas, if (night) "夜间" else "日间", 1560f, 826f, 25f, muted, regular, Paint.Align.CENTER)
+        paint.color = white; paint.style = Paint.Style.STROKE; paint.strokeWidth = 3f
+        path.reset(); path.moveTo(1652f, 754f); path.lineTo(1667f, 748f); path.lineTo(1682f, 754f); path.lineTo(1698f, 748f)
+        path.lineTo(1698f, 786f); path.lineTo(1682f, 792f); path.lineTo(1667f, 786f); path.lineTo(1652f, 792f); path.close()
+        canvas.drawPath(path, paint); canvas.drawLine(1667f, 748f, 1667f, 786f, paint); canvas.drawLine(1682f, 754f, 1682f, 792f, paint)
+        paint.style = Paint.Style.FILL
+        text(canvas, if (mapNight) "地图夜" else "地图日", 1675f, 826f, 23f, muted, regular, Paint.Align.CENTER)
         house(canvas, 1797f, 773f)
         text(canvas, "主页", 1797f, 826f, 25f, muted, regular, Paint.Align.CENTER)
         canvas.restore()
@@ -256,26 +281,42 @@ internal class FusionDashboardView(context: Context) : View(context) {
         path.lineTo(x - 4, y - 8); path.lineTo(x + 21, y - 8); path.lineTo(x + 21, y + 8)
         path.lineTo(x - 4, y + 8); path.lineTo(x - 4, y + 20); path.close(); c.drawPath(path, paint)
     }
-    private val firstRow = arrayOf(DashboardIndicator.LEFT_TURN, DashboardIndicator.RIGHT_TURN,
-        DashboardIndicator.HIGH_BEAM, DashboardIndicator.LOW_BEAM, DashboardIndicator.POSITION_LIGHT,
-        DashboardIndicator.VEHICLE_BLUETOOTH, DashboardIndicator.PHONE_BLUETOOTH, DashboardIndicator.GPS, DashboardIndicator.GSM)
-    private val secondRow = arrayOf(DashboardIndicator.FAULT, DashboardIndicator.ENERGY_RECOVERY, DashboardIndicator.READY,
-        DashboardIndicator.SIDE_STAND, DashboardIndicator.REPAIR_MODE, DashboardIndicator.SEAT, DashboardIndicator.ABS,
-        DashboardIndicator.RIDER_UNSEATED, DashboardIndicator.HDC, DashboardIndicator.CRUISE, DashboardIndicator.TCS, DashboardIndicator.CHARGING)
+    private val secondRow = arrayOf(DashboardIndicator.FAULT, DashboardIndicator.ENERGY_RECOVERY,
+        DashboardIndicator.SIDE_STAND, DashboardIndicator.SEAT, DashboardIndicator.ABS,
+        DashboardIndicator.RIDER_UNSEATED, DashboardIndicator.HDC, DashboardIndicator.CRUISE,
+        DashboardIndicator.TCS, DashboardIndicator.CHARGING)
+    private fun topIcon(c: Canvas, id: DashboardIndicator, x: Float) {
+        c.save(); c.translate(x, 49f)
+        when (id) {
+            DashboardIndicator.HIGH_BEAM -> c.scale(.85f, 1f)
+            DashboardIndicator.LOW_BEAM -> { c.scale(.85f, .95f); c.translate(0f, -3f) }
+            DashboardIndicator.POSITION_LIGHT -> c.scale(.85f, 1f)
+            DashboardIndicator.VEHICLE_BLUETOOTH -> { c.scale(.88f, .88f); c.translate(0f, 4f) }
+            DashboardIndicator.PHONE_BLUETOOTH -> c.scale(1.2f, 1f)
+            DashboardIndicator.GPS -> { c.scale(1.2f, 1.05f); c.translate(0f, -3f) }
+            DashboardIndicator.GSM -> c.scale(1.2f, 1.1f)
+            DashboardIndicator.READY -> c.scale(1.05f, 1.05f)
+            else -> c.scale(.9f, .9f)
+        }
+        statusIcon(c, id, 0f, 0f); c.restore()
+    }
     private fun drawIndicators(c: Canvas) {
-        glass(c, 12f, 8f, 980f, 90f, 38f)
-        firstRow.forEachIndexed { index, id -> statusIcon(c, id, 48f + index * 61f, 49f) }
-        text(c, clock, 606f, 63f, 39f, white, medium)
-        glass(c, 770f, 26f, 956f, 71f, 22f)
-        text(c, if (indicators.demonstration) "车辆数据演示" else "仪表状态", 863f, 55f, 21f, muted, regular, Paint.Align.CENTER)
-        val step = minOf(88f, (logicalHeight - 262f) / 6f)
-        val top = (100f + logicalHeight - 142f - step * 6) / 2
+        glass(c, 12f, 8f, 1008f, 90f, 38f)
+        topIcon(c, DashboardIndicator.LEFT_TURN, 48f)
+        topIcon(c, DashboardIndicator.HIGH_BEAM, 128f)
+        topIcon(c, DashboardIndicator.LOW_BEAM, 210f)
+        topIcon(c, DashboardIndicator.POSITION_LIGHT, 292f)
+        topIcon(c, DashboardIndicator.VEHICLE_BLUETOOTH, 374f)
+        topIcon(c, DashboardIndicator.READY, 466f)
+        topIcon(c, DashboardIndicator.PHONE_BLUETOOTH, 574f)
+        topIcon(c, DashboardIndicator.GPS, 652f)
+        topIcon(c, DashboardIndicator.GSM, 730f)
+        text(c, clock, 800f, 63f, 39f, white, medium)
+        topIcon(c, DashboardIndicator.RIGHT_TURN, 970f)
+        val capacity = ((logicalHeight - 280f) / 82f).toInt().coerceIn(1, secondRow.size)
+        val step = 82f
         secondRow.forEachIndexed { index, id ->
-            val x = 54f + (index % 2) * 80f
-            val y = top + (index / 2 + .5f) * step
-            glass(c, x - 36, y - step / 2 + 4, x + 36, y + step / 2 - 4, 17f)
-            statusIcon(c, id, x, y - 10)
-            text(c, indicatorCaption(id), x, y + 28, maxOf(18f, 12f * 1920f / width.coerceAtLeast(1)), muted, medium, Paint.Align.CENTER)
+            statusIcon(c, id, 54f + (index / capacity) * 80f, 170f + (index % capacity) * step)
         }
     }
     private fun statusColor(id: DashboardIndicator): Int {
@@ -288,21 +329,6 @@ internal class FusionDashboardView(context: Context) : View(context) {
             DashboardIndicator.RIDER_UNSEATED, DashboardIndicator.REPAIR_MODE -> Color.rgb(239, 169, 38)
             else -> green
         }
-    }
-    private fun indicatorCaption(id: DashboardIndicator): String = when (id) {
-        DashboardIndicator.FAULT -> "故障"
-        DashboardIndicator.ENERGY_RECOVERY -> "回收"
-        DashboardIndicator.READY -> "就绪"
-        DashboardIndicator.SIDE_STAND -> "侧撑"
-        DashboardIndicator.REPAIR_MODE -> "维修"
-        DashboardIndicator.SEAT -> "座桶"
-        DashboardIndicator.ABS -> "ABS"
-        DashboardIndicator.RIDER_UNSEATED -> "骑手"
-        DashboardIndicator.HDC -> "缓降"
-        DashboardIndicator.CRUISE -> "巡航"
-        DashboardIndicator.TCS -> "牵引"
-        DashboardIndicator.CHARGING -> "充电"
-        else -> id.label
     }
     private fun motorcycle(c: Canvas, x: Float, y: Float) {
         c.drawCircle(x - 18, y + 8, 8f, paint); c.drawCircle(x + 18, y + 8, 8f, paint)
@@ -354,30 +380,34 @@ internal class FusionDashboardView(context: Context) : View(context) {
                 text(c, "ABS", x, y + 6, 17f, color, medium, Paint.Align.CENTER)
             }
             DashboardIndicator.TCS -> {
-                motorcycle(c, x, y - 6)
-                for (offset in listOf(-12f, 13f)) {
-                    path.reset(); path.moveTo(x + offset, y + 8); path.cubicTo(x + offset - 12, y + 15, x + offset + 12, y + 17, x + offset, y + 24)
-                    c.drawPath(path, paint)
-                }
+                c.drawCircle(x, y, 23f, paint)
+                text(c, "TC", x, y + 8, 24f, color, medium, Paint.Align.CENTER)
             }
             DashboardIndicator.HDC -> {
                 c.save(); c.rotate(20f, x, y); motorcycle(c, x, y - 4); c.drawLine(x - 25, y + 12, x + 25, y + 12, paint); c.restore()
                 c.drawLine(x + 23, y - 20, x + 23, y - 6, paint); c.drawLine(x + 17, y - 12, x + 23, y - 6, paint); c.drawLine(x + 29, y - 12, x + 23, y - 6, paint)
             }
             DashboardIndicator.CRUISE -> {
-                rect.set(x - 23, y - 21, x + 23, y + 25); c.drawArc(rect, 145f, 250f, false, paint)
+                rect.set(x - 24, y - 23, x + 24, y + 25); c.drawArc(rect, 145f, 250f, false, paint)
+                for (angle in listOf(150.0, 200.0, 250.0, 300.0, 350.0)) {
+                    val a = Math.toRadians(angle)
+                    c.drawLine(x + (19 * Math.cos(a)).toFloat(), y + (19 * Math.sin(a)).toFloat(), x + (24 * Math.cos(a)).toFloat(), y + (24 * Math.sin(a)).toFloat(), paint)
+                }
                 c.drawLine(x, y + 2, x + 12, y - 13, paint); c.drawCircle(x, y + 2, 3f, paint)
-                c.drawLine(x - 14, y + 22, x + 11, y + 22, paint); c.drawLine(x + 5, y + 16, x + 11, y + 22, paint); c.drawLine(x + 5, y + 28, x + 11, y + 22, paint)
+                c.drawLine(x - 19, y + 24, x + 15, y + 24, paint); c.drawLine(x + 8, y + 17, x + 15, y + 24, paint); c.drawLine(x + 8, y + 31, x + 15, y + 24, paint)
             }
             DashboardIndicator.FAULT -> {
                 motorcycle(c, x, y + 5)
                 text(c, "!", x + 24, y - 9, 25f, color, bold, Paint.Align.CENTER)
             }
             DashboardIndicator.ENERGY_RECOVERY -> {
-                rect.set(x - 17, y - 13, x + 17, y + 13); c.drawRoundRect(rect, 5f, 5f, paint)
-                path.reset(); path.moveTo(x + 4, y - 8); path.lineTo(x - 5, y + 1); path.lineTo(x + 3, y + 1); path.lineTo(x - 4, y + 9); c.drawPath(path, paint)
-                rect.set(x - 25, y - 24, x + 25, y + 24); c.drawArc(rect, 35f, 285f, false, paint)
-                c.drawLine(x + 20, y - 12, x + 23, y - 1, paint); c.drawLine(x + 23, y - 1, x + 13, y - 3, paint)
+                rect.set(x - 16, y - 11, x + 16, y + 11); c.drawRoundRect(rect, 3f, 3f, paint)
+                c.drawLine(x + 16, y - 4, x + 20, y - 4, paint); c.drawLine(x + 20, y - 4, x + 20, y + 4, paint); c.drawLine(x + 20, y + 4, x + 16, y + 4, paint)
+                path.reset(); path.moveTo(x + 3, y - 7); path.lineTo(x - 4, y + 1); path.lineTo(x + 3, y + 1); path.lineTo(x - 3, y + 8); c.drawPath(path, paint)
+                rect.set(x - 26, y - 25, x + 26, y + 25)
+                c.drawArc(rect, 200f, 125f, false, paint); c.drawArc(rect, 20f, 125f, false, paint)
+                c.drawLine(x + 21, y - 20, x + 21, y - 12, paint); c.drawLine(x + 21, y - 12, x + 13, y - 14, paint)
+                c.drawLine(x - 21, y + 20, x - 21, y + 12, paint); c.drawLine(x - 21, y + 12, x - 13, y + 14, paint)
             }
             DashboardIndicator.SIDE_STAND -> {
                 motorcycle(c, x, y - 3); c.drawLine(x + 1, y + 1, x + 10, y + 23, paint); c.drawLine(x + 4, y + 23, x + 20, y + 23, paint)

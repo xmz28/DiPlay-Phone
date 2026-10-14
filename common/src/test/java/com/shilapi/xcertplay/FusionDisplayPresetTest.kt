@@ -46,4 +46,21 @@ class FusionDisplayPresetTest {
         org.junit.Assert.assertFalse(CarPlayOrientation.rotationCompatible(1, 0, request))
         org.junit.Assert.assertFalse(CarPlayOrientation.rotationCompatible(1, 3, android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE))
     }
+    @Test fun mapOnlySelectionRetainsHudAndZeroDurationSnaps() {
+        val context = org.robolectric.RuntimeEnvironment.getApplication()
+        FusionThemeSettings.select(context, true, true)
+        org.junit.Assert.assertTrue(FusionThemeSettings.mapIndependent(context))
+        org.junit.Assert.assertTrue(FusionThemeSettings.hudNight(context, false))
+        val view = FusionDashboardView(context)
+        view.setNightMode(false, false)
+        view.setMapNightMode(true)
+        assertEquals(0f, view.themeFraction)
+        FusionThemeSettings.saveDuration(context, 0)
+        view.setNightMode(true, true)
+        assertEquals(1f, view.themeFraction)
+        FusionThemeSettings.select(context, false, false)
+        org.junit.Assert.assertFalse(FusionThemeSettings.mapIndependent(context))
+        org.junit.Assert.assertFalse(FusionThemeSettings.hudNight(context, true))
+        FusionThemeSettings.saveDuration(context, 1000)
+    }
 }

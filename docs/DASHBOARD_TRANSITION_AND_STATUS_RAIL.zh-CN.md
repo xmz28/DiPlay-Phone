@@ -33,9 +33,9 @@ CarPlay 日夜请求仍立即发送，仪表配色改为约 1500 ms 的平滑过
 - 就绪：保留 READY。
 - 侧撑：摩托车与支撑脚。
 - 维修：扳手。
-- 座桶：开启的座桶盖板，参考原项目 `hmi20_seat_open`。
+- 座桶：开启的座桶盖板，表示开启的座桶。
 - ABS：制动圆环、左右括弧与 ABS 字样。
-- 骑手：座位与向下提示箭头，参考原项目 `hmi20_driver_unstable`。
+- 骑手：座位与向下提示箭头，对应骑手未就座状态。
 - 缓降：下坡摩托车、坡面及向下箭头。
 - 巡航：速度表、指针与巡航箭头。
 - 牵引：摩托车及滑动轨迹。
@@ -43,7 +43,7 @@ CarPlay 日夜请求仍立即发送，仪表配色改为约 1500 ms 的平滑过
 
 沿用统一圆润线条和现有配色，状态定义、active/blinking 及演示数据接口保持一致，不新增任何实车协议。参考形状不用于推断原协议的告警极性。
 
-参考：[MyApplication 本机图标与字段](../../MyApplication/app/src/main/java/com/example/myapplication/ui/HmiDashboardView.kt)、[本田官方仪表说明](https://webom.hondamotopub.com/webom/HMEE/MKR241/html/GOG005001.html)、[本田指示灯介绍](https://global.honda/en/motorcycle-aftersales/plusone/202412.html)、[丰田常见警示灯说明](https://www.toyota.co.uk/owners/vehicle-information/warning-signs-and-sensors)。新图形自行绘制，不复制品牌标志。
+参考：[本田官方仪表说明](https://webom.hondamotopub.com/webom/HMEE/MKR241/html/GOG005001.html)、[本田指示灯介绍](https://global.honda/en/motorcycle-aftersales/plusone/202412.html)、[丰田常见警示灯说明](https://www.toyota.co.uk/owners/vehicle-information/warning-signs-and-sensors)。新图形自行绘制，不复制品牌标志。
 
 ## 验证
 

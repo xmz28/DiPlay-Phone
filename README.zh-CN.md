@@ -56,3 +56,8 @@
 标准导航小组件需要支持 Android 小组件的启动器；比亚迪内置主页不接受任意小组件。悬浮地图和嵌入地图需要启用“CarPlay 仪表地图”。应用及网站支持英语、简体中文、阿拉伯语、俄语、乌克兰语和西班牙语。源代码、构建说明及许可证随版本提供。
 
 - [六寸仪表比例预设、音乐及电压电流](docs/FUSION_CLUSTER_PRESET_AND_MEDIA.zh-CN.md)
+
+
+- [顶部与竖列布局、独立地图日夜和渐变时长](docs/DASHBOARD_LAYOUT_AND_INDEPENDENT_MAP_THEME.zh-CN.md)
+
+- [公开图标与私有参考资料边界](docs/PUBLIC_ICON_ASSET_BOUNDARY.zh-CN.md)

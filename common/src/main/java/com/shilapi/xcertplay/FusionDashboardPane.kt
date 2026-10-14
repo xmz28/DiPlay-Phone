@@ -15,7 +15,7 @@ import com.shilapi.xcertplay.glance.CarPlayGlance
 
 /** Remains mounted alongside the primary texture; changing page does not replace its decoder. */
 internal class FusionDashboardPane(context: Context, private val main: () -> Unit,
-    private val home: () -> Unit, private val onFrame: () -> Unit, private val toggleTheme: () -> Unit = {}) : FrameLayout(context), TextureView.SurfaceTextureListener {
+    private val home: () -> Unit, private val onFrame: () -> Unit, private val toggleTheme: () -> Unit = {}, private val toggleMapTheme: () -> Unit = {}) : FrameLayout(context), TextureView.SurfaceTextureListener {
     private val handler = Handler(Looper.getMainLooper())
     private val key = "fusion:dashboard"
     private var surface: Surface? = null
@@ -27,6 +27,11 @@ internal class FusionDashboardPane(context: Context, private val main: () -> Uni
         foreground.setNightMode(value)
         themeButton.contentDescription = if (value) "切换到日间模式" else "切换到夜间模式"
         themeButton.tooltipText = themeButton.contentDescription
+    }
+    fun setMapNightMode(value: Boolean) {
+        foreground.setMapNightMode(value)
+        mapThemeButton.contentDescription = if (value) "仅地图切换到日间" else "仅地图切换到夜间"
+        mapThemeButton.tooltipText = mapThemeButton.contentDescription
     }
     private fun refreshForeground() {
         foreground.setIndicators(indicatorSource.snapshot())
@@ -61,11 +66,15 @@ internal class FusionDashboardPane(context: Context, private val main: () -> Uni
         text = ""; contentDescription = "切换到日间模式"; setBackgroundColor(Color.TRANSPARENT)
         setOnClickListener { toggleTheme() }
     }
+    private val mapThemeButton = Button(context).apply {
+        text = ""; contentDescription = "仅切换地图日夜模式"; setBackgroundColor(Color.TRANSPARENT)
+        setOnClickListener { toggleMapTheme() }
+    }
     init {
         setBackgroundColor(Color.rgb(3, 10, 17))
         addView(texture)
         addView(foreground, LayoutParams(-1, -1))
-        addView(carplay); addView(homeButton); addView(themeButton)
+        addView(carplay); addView(homeButton); addView(themeButton); addView(mapThemeButton)
         foreground.onBackgroundChanged = { setBackgroundColor(it) }
         addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> layoutChildren() }
         refreshForeground()
@@ -73,7 +82,7 @@ internal class FusionDashboardPane(context: Context, private val main: () -> Uni
     }
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
         if (!pageActive) return false
-        if (swipe.handle(event, true)) { carplay.isPressed = false; homeButton.isPressed = false; themeButton.isPressed = false; return true }
+        if (swipe.handle(event, true)) { carplay.isPressed = false; homeButton.isPressed = false; themeButton.isPressed = false; mapThemeButton.isPressed = false; return true }
         return super.dispatchTouchEvent(event)
     }
     override fun onTouchEvent(event: MotionEvent): Boolean = pageActive
@@ -97,8 +106,9 @@ internal class FusionDashboardPane(context: Context, private val main: () -> Uni
         val top = (height - 142 * scale).toInt().coerceAtLeast(0)
         val buttonHeight = minOf(height - top, (128 * scale).toInt())
         place(carplay, (width * .22f).toInt(), buttonHeight, (width * .02f).toInt(), top)
-        place(homeButton, (width * .095f).toInt(), buttonHeight, (width * .89f).toInt(), top)
-        place(themeButton, (width * .075f).toInt(), buttonHeight, (width * .81f).toInt(), top)
+        place(homeButton, (width * (112f / 1920)).toInt(), buttonHeight, (width * (1748f / 1920)).toInt(), top)
+        place(themeButton, (width * (110f / 1920)).toInt(), buttonHeight, (width * (1505f / 1920)).toInt(), top)
+        place(mapThemeButton, (width * (110f / 1920)).toInt(), buttonHeight, (width * (1620f / 1920)).toInt(), top)
     }
     override fun onAttachedToWindow() { super.onAttachedToWindow(); MapMirrors.addAspectListener(aspectChanged) }
     override fun onDetachedFromWindow() {

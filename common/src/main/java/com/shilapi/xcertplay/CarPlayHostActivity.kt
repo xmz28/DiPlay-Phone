@@ -429,7 +429,11 @@ class CarPlayHostActivity : ComponentActivity() {
             initialNight = darkMode,
         ) { night ->
             darkMode = night
-            fusionPane?.setNightMode(night)
+            fusionPane?.setMapNightMode(night)
+            if (!FusionThemeSettings.mapIndependent(this)) {
+                FusionThemeSettings.select(this, night, false)
+                fusionPane?.setNightMode(night)
+            }
             applyClusterTurnOverlay()
             appendLog("CarPlay switched to ${if (night) "night" else "day"} mode")
             logThemeState(nightModeDiagnosticSource, resources.configuration)
@@ -1173,7 +1177,9 @@ class CarPlayHostActivity : ComponentActivity() {
         root.addView(gestureLayer, FrameLayout.LayoutParams(-1, -1))
         val fusion = FusionDashboardPane(this, { showDisplayPage(false) }, { showDiPlayHome() }, {
             if (waitingForFusion) showDisplayPage(true, waitForFrame = false)
-        }, { toggleFusionTheme() }).apply { alpha = .001f; setNightMode(darkMode) }
+        }, { toggleFusionTheme() }, { toggleFusionMapTheme() }).apply {
+            alpha = .001f; setNightMode(FusionThemeSettings.hudNight(this@CarPlayHostActivity, darkMode)); setMapNightMode(darkMode)
+        }
         fusionPane = fusion
         root.addView(fusion, FrameLayout.LayoutParams(-1, -1))
         fusionRoot = root
@@ -4053,11 +4059,24 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun toggleFusionTheme() {
-        carPlayNightMode = if (darkMode) CarPlayNightMode.DAY else CarPlayNightMode.NIGHT
+        val target = !FusionThemeSettings.hudNight(this, darkMode)
+        FusionThemeSettings.select(this, target, false)
+        configureFusionMapNight(target)
+        fusionPane?.setNightMode(target)
+        fusionPane?.setMapNightMode(target)
+    }
+
+    private fun toggleFusionMapTheme() {
+        FusionThemeSettings.select(this, FusionThemeSettings.hudNight(this, darkMode), true)
+        configureFusionMapNight(!darkMode)
+        fusionPane?.setMapNightMode(darkMode)
+    }
+
+    private fun configureFusionMapNight(target: Boolean) {
+        carPlayNightMode = if (target) CarPlayNightMode.NIGHT else CarPlayNightMode.DAY
         AirPlayPersistence.saveCarPlayNightMode(this, carPlayNightMode)
         nightModeController.configure(carPlayNightMode, nightModeOrNull(resources.configuration.uiMode) ?: false,
             ambientLightThreshold, ambientDelaySeconds)
-        fusionPane?.setNightMode(darkMode)
     }
 
     private fun openSettingsMenu() = showDiPlayHome("settings")
