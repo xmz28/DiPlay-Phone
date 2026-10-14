@@ -52,3 +52,5 @@ DashboardIndicatorSignal 表达 active 和 blinking；DashboardIndicatorSnapshot
 实机截图保存在同级支持目录 `DiPlay-local-support/backups/fusion-theme-day.png`、`fusion-theme-night.png`。修改前的 Git 保存点为 3d01b6c；本轮主题和布局优化在该保存点之后继续修改，未自动追加提交。
 
 用户随后确认日夜联动功能正常。本版本本地仪表配色仍立即切换，iPhone 地图约有两秒渐变；下一轮将增加本地配色过渡，把第二排状态改成左侧竖排并改进图标辨识，同时实测屏幕刘海安全区。此处先保存已验证版本，避免把后续计划写成已完成结果。
+
+此版本随后已保存为 `5fa31d3`。后续实现与实测结果见[配色过渡和左侧状态栏](DASHBOARD_TRANSITION_AND_STATUS_RAIL.zh-CN.md)；前文“立即切换”和“顶部第二排”描述的是保存点版本。

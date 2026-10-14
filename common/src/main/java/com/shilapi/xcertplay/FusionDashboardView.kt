@@ -1,8 +1,11 @@
 package com.shilapi.xcertplay
 
 import android.content.Context
+import android.animation.ValueAnimator
 import android.graphics.*
 import android.view.View
+import android.view.animation.AccelerateDecelerateInterpolator
+import androidx.core.graphics.ColorUtils
 import androidx.core.content.ContextCompat
 import com.shilapi.xcertplay.glance.CarPlayGlance
 import com.shilapi.xcertplay.host.R
@@ -18,16 +21,39 @@ internal class FusionDashboardView(context: Context) : View(context) {
     private val vehicle = VehiclePreview()
     private var indicators = DemoDashboardIndicators.snapshot()
     private var night = true
+    internal var themeFraction = 1f
+        private set
+    private var themeAnimator: ValueAnimator? = null
+    var onBackgroundChanged: ((Int) -> Unit)? = null
     fun setIndicators(value: DashboardIndicatorSnapshot) { indicators = value }
-    fun setNightMode(value: Boolean) {
+    fun setNightMode(value: Boolean, animate: Boolean = isAttachedToWindow && width > 0) {
         if (night == value) return
         night = value
-        white = if (value) Color.rgb(244, 247, 255) else Color.rgb(20, 35, 53)
-        muted = if (value) Color.rgb(167, 184, 210) else Color.rgb(82, 102, 123)
-        green = if (value) Color.rgb(28, 233, 100) else Color.rgb(0, 145, 82)
+        themeAnimator?.cancel()
+        val target = if (value) 1f else 0f
+        if (!animate) { themeFraction = target; applyPalette(); return }
+        themeAnimator = ValueAnimator.ofFloat(themeFraction, target).apply {
+            duration = 1500L
+            interpolator = AccelerateDecelerateInterpolator()
+            addUpdateListener { themeFraction = it.animatedValue as Float; applyPalette() }
+            start()
+        }
+    }
+    private fun themed(day: Int, night: Int) = ColorUtils.blendARGB(day, night, themeFraction)
+    private fun applyPalette() {
+        white = themed(Color.rgb(20, 35, 53), Color.rgb(244, 247, 255))
+        muted = themed(Color.rgb(82, 102, 123), Color.rgb(167, 184, 210))
+        green = themed(Color.rgb(0, 145, 82), Color.rgb(28, 233, 100))
         glyph?.setTint(white)
         rebuildBackgroundShaders()
+        onBackgroundChanged?.invoke(themed(Color.rgb(232, 239, 246), Color.rgb(3, 10, 17)))
         invalidate()
+    }
+    override fun onDetachedFromWindow() {
+        themeAnimator?.cancel(); themeAnimator = null
+        themeFraction = if (night) 1f else 0f
+        applyPalette()
+        super.onDetachedFromWindow()
     }
     private var glance = CarPlayGlance.Snapshot()
     private var mapActive = false
@@ -87,7 +113,8 @@ internal class FusionDashboardView(context: Context) : View(context) {
         rebuildBackgroundShaders()
     }
     private fun rebuildBackgroundShaders() {
-        val r = if (night) 3 else 232; val g = if (night) 10 else 239; val b = if (night) 17 else 246
+        val base = themed(Color.rgb(232, 239, 246), Color.rgb(3, 10, 17))
+        val r = Color.red(base); val g = Color.green(base); val b = Color.blue(base)
         leftFade = LinearGradient(0f, 0f, 1030f, 0f,
             intArrayOf(Color.rgb(r, g, b), Color.argb(247, r, g, b), Color.argb(185, r, g, b), Color.TRANSPARENT),
             floatArrayOf(0f, .53f, .76f, 1f), Shader.TileMode.CLAMP)
@@ -109,10 +136,10 @@ internal class FusionDashboardView(context: Context) : View(context) {
 
         canvas.save()
         canvas.translate(0f, (logicalHeight - 864f) / 2)
-        canvas.translate(46f, 30f)
+        canvas.translate(137f, 0f)
         canvas.scale(1.07f, 1.07f, 339f, 403f)
         paint.style = Paint.Style.STROKE; paint.strokeWidth = 16f; paint.strokeCap = Paint.Cap.ROUND
-        paint.color = if (night) Color.rgb(17, 32, 44) else Color.rgb(184, 201, 215)
+        paint.color = themed(Color.rgb(184, 201, 215), Color.rgb(17, 32, 44))
         rect.set(76f, 140f, 602f, 666f)
         canvas.drawArc(rect, 140f, 260f, false, paint)
         paint.color = blue
@@ -175,19 +202,30 @@ internal class FusionDashboardView(context: Context) : View(context) {
     private fun text(c: Canvas, value: String, x: Float, y: Float, size: Float, color: Int,
         font: Typeface = regular, align: Paint.Align = Paint.Align.LEFT) {
         textPaint.textSize = size; textPaint.color = color; textPaint.typeface = font; textPaint.textAlign = align
+        // A subtle permanent edge avoids a conspicuous outline appearing only during transitions.
+        run {
+            val background = themed(Color.rgb(232, 239, 246), Color.rgb(3, 10, 17))
+            textPaint.style = Paint.Style.STROKE
+            textPaint.strokeWidth = maxOf(.5f, size * .004f)
+            textPaint.strokeJoin = Paint.Join.ROUND
+            textPaint.color = if (ColorUtils.calculateLuminance(background) > .35)
+                Color.argb(80, 10, 20, 35) else Color.argb(90, 250, 252, 255)
+            c.drawText(value, x, y, textPaint)
+            textPaint.style = Paint.Style.FILL; textPaint.color = color
+        }
         c.drawText(value, x, y, textPaint)
     }
     private fun shorten(value: String, max: Int) = if (value.length > max) value.take(max - 1) + "…" else value
     private fun glass(c: Canvas, l: Float, t: Float, r: Float, b: Float, radius: Float) {
         rect.set(l, t, r, b); paint.style = Paint.Style.FILL
-        paint.color = if (night) Color.argb(225, 5, 14, 24) else Color.argb(235, 248, 251, 255)
+        paint.color = themed(Color.argb(235, 248, 251, 255), Color.argb(225, 5, 14, 24))
         c.drawRoundRect(rect, radius, radius, paint)
         paint.style = Paint.Style.STROKE; paint.strokeWidth = 1.5f
-        paint.color = if (night) Color.argb(115, 59, 81, 105) else Color.argb(170, 164, 184, 204)
+        paint.color = themed(Color.argb(170, 164, 184, 204), Color.argb(115, 59, 81, 105))
         c.drawRoundRect(rect, radius, radius, paint); paint.style = Paint.Style.FILL
     }
     private fun line(c: Canvas, x1: Float, y1: Float, x2: Float, y2: Float) {
-        paint.color = if (night) Color.rgb(49, 68, 87) else Color.rgb(160, 178, 194)
+        paint.color = themed(Color.rgb(160, 178, 194), Color.rgb(49, 68, 87))
         paint.strokeWidth = 1.5f; c.drawLine(x1, y1, x2, y2, paint)
     }
     private fun arrow(c: Canvas, x: Float, y: Float, color: Int) {
@@ -207,12 +245,19 @@ internal class FusionDashboardView(context: Context) : View(context) {
         text(c, clock, 606f, 63f, 39f, white, medium)
         glass(c, 770f, 26f, 956f, 71f, 22f)
         text(c, if (indicators.demonstration) "车辆数据演示" else "仪表状态", 863f, 55f, 21f, muted, regular, Paint.Align.CENTER)
-        glass(c, 12f, 99f, 980f, 151f, 22f)
-        secondRow.forEachIndexed { index, id -> statusIcon(c, id, 50f + index * 76f, 125f) }
+        val step = minOf(88f, (logicalHeight - 262f) / 6f)
+        val top = (100f + logicalHeight - 142f - step * 6) / 2
+        secondRow.forEachIndexed { index, id ->
+            val x = 54f + (index % 2) * 80f
+            val y = top + (index / 2 + .5f) * step
+            glass(c, x - 36, y - step / 2 + 4, x + 36, y + step / 2 - 4, 17f)
+            statusIcon(c, id, x, y - 10)
+            text(c, indicatorCaption(id), x, y + 28, maxOf(18f, 12f * 1920f / width.coerceAtLeast(1)), muted, medium, Paint.Align.CENTER)
+        }
     }
     private fun statusColor(id: DashboardIndicator): Int {
         val state = indicators.signal(id)
-        if (!state.active || (state.blinking && !blink)) return if (night) Color.rgb(70, 89, 112) else Color.rgb(145, 160, 177)
+        if (!state.active || (state.blinking && !blink)) return themed(Color.rgb(145, 160, 177), Color.rgb(70, 89, 112))
         return when (id) {
             DashboardIndicator.HIGH_BEAM, DashboardIndicator.VEHICLE_BLUETOOTH, DashboardIndicator.PHONE_BLUETOOTH -> blue
             DashboardIndicator.FAULT -> Color.rgb(244, 70, 75)
@@ -221,9 +266,42 @@ internal class FusionDashboardView(context: Context) : View(context) {
             else -> green
         }
     }
+    private fun indicatorCaption(id: DashboardIndicator): String = when (id) {
+        DashboardIndicator.FAULT -> "故障"
+        DashboardIndicator.ENERGY_RECOVERY -> "回收"
+        DashboardIndicator.READY -> "就绪"
+        DashboardIndicator.SIDE_STAND -> "侧撑"
+        DashboardIndicator.REPAIR_MODE -> "维修"
+        DashboardIndicator.SEAT -> "座桶"
+        DashboardIndicator.ABS -> "ABS"
+        DashboardIndicator.RIDER_UNSEATED -> "骑手"
+        DashboardIndicator.HDC -> "缓降"
+        DashboardIndicator.CRUISE -> "巡航"
+        DashboardIndicator.TCS -> "牵引"
+        DashboardIndicator.CHARGING -> "充电"
+        else -> id.label
+    }
+    private fun motorcycle(c: Canvas, x: Float, y: Float) {
+        c.drawCircle(x - 18, y + 8, 8f, paint); c.drawCircle(x + 18, y + 8, 8f, paint)
+        path.reset(); path.moveTo(x - 18, y + 8); path.lineTo(x - 8, y - 7)
+        path.cubicTo(x - 2, y - 12, x + 6, y - 11, x + 9, y - 4)
+        path.lineTo(x + 1, y + 8); path.lineTo(x - 18, y + 8); c.drawPath(path, paint)
+        c.drawLine(x - 18, y - 10, x - 6, y - 10, paint)
+        c.drawLine(x + 8, y - 16, x + 18, y + 8, paint); c.drawLine(x + 8, y - 16, x + 17, y - 16, paint)
+    }
+    private fun seat(c: Canvas, x: Float, y: Float, open: Boolean) {
+        path.reset(); path.moveTo(x - 24, y + 8)
+        path.cubicTo(x - 12, y - 2, x + 9, y - 2, x + 23, y + 3)
+        path.lineTo(x + 21, y + 14); path.lineTo(x - 22, y + 14); path.close(); c.drawPath(path, paint)
+        if (open) {
+            path.reset(); path.moveTo(x - 22, y + 2); path.cubicTo(x - 11, y - 14, x + 10, y - 20, x + 20, y - 17)
+            c.drawPath(path, paint); c.drawLine(x + 20, y - 17, x + 22, y - 5, paint)
+        }
+    }
     private fun statusIcon(c: Canvas, id: DashboardIndicator, x: Float, y: Float) {
         val color = statusColor(id)
-        paint.color = color; paint.style = Paint.Style.STROKE; paint.strokeWidth = 3f; paint.strokeCap = Paint.Cap.ROUND
+        paint.color = color; paint.style = Paint.Style.STROKE; paint.strokeWidth = 3f
+        paint.strokeCap = Paint.Cap.ROUND; paint.strokeJoin = Paint.Join.ROUND
         when (id) {
             DashboardIndicator.LEFT_TURN -> { paint.style = Paint.Style.FILL; arrow(c, x, y, color) }
             DashboardIndicator.RIGHT_TURN -> { paint.style = Paint.Style.FILL; c.save(); c.scale(-1f, 1f, x, y); arrow(c, x, y, color); c.restore() }
@@ -246,28 +324,53 @@ internal class FusionDashboardView(context: Context) : View(context) {
             }
             DashboardIndicator.GSM -> { for (i in 0..3) c.drawLine(x - 15 + i * 10, y + 17, x - 15 + i * 10, y + 6 - i * 9, paint) }
             DashboardIndicator.READY -> text(c, "READY", x, y + 7, 22f, color, medium, Paint.Align.CENTER)
-            DashboardIndicator.ABS, DashboardIndicator.TCS, DashboardIndicator.HDC, DashboardIndicator.CRUISE -> {
-                c.drawCircle(x, y, 22f, paint)
-                val label = if (id == DashboardIndicator.CRUISE) "CC" else id.name
-                text(c, label, x, y + 6, 17f, color, medium, Paint.Align.CENTER)
+            DashboardIndicator.ABS -> {
+                rect.set(x - 20, y - 18, x + 20, y + 18); c.drawOval(rect, paint)
+                rect.set(x - 28, y - 23, x + 28, y + 23)
+                c.drawArc(rect, 145f, 70f, false, paint); c.drawArc(rect, -35f, 70f, false, paint)
+                text(c, "ABS", x, y + 6, 17f, color, medium, Paint.Align.CENTER)
+            }
+            DashboardIndicator.TCS -> {
+                motorcycle(c, x, y - 6)
+                for (offset in listOf(-12f, 13f)) {
+                    path.reset(); path.moveTo(x + offset, y + 8); path.cubicTo(x + offset - 12, y + 15, x + offset + 12, y + 17, x + offset, y + 24)
+                    c.drawPath(path, paint)
+                }
+            }
+            DashboardIndicator.HDC -> {
+                c.save(); c.rotate(20f, x, y); motorcycle(c, x, y - 4); c.drawLine(x - 25, y + 12, x + 25, y + 12, paint); c.restore()
+                c.drawLine(x + 23, y - 20, x + 23, y - 6, paint); c.drawLine(x + 17, y - 12, x + 23, y - 6, paint); c.drawLine(x + 29, y - 12, x + 23, y - 6, paint)
+            }
+            DashboardIndicator.CRUISE -> {
+                rect.set(x - 23, y - 21, x + 23, y + 25); c.drawArc(rect, 145f, 250f, false, paint)
+                c.drawLine(x, y + 2, x + 12, y - 13, paint); c.drawCircle(x, y + 2, 3f, paint)
+                c.drawLine(x - 14, y + 22, x + 11, y + 22, paint); c.drawLine(x + 5, y + 16, x + 11, y + 22, paint); c.drawLine(x + 5, y + 28, x + 11, y + 22, paint)
             }
             DashboardIndicator.FAULT -> {
-                path.reset(); path.moveTo(x, y - 20); path.lineTo(x - 22, y + 17); path.lineTo(x + 22, y + 17); path.close(); c.drawPath(path, paint)
-                text(c, "!", x, y + 10, 27f, color, bold, Paint.Align.CENTER)
+                motorcycle(c, x, y + 5)
+                text(c, "!", x + 24, y - 9, 25f, color, bold, Paint.Align.CENTER)
             }
-            DashboardIndicator.ENERGY_RECOVERY -> { c.drawArc(RectF(x - 19, y - 19, x + 19, y + 19), 35f, 290f, false, paint); c.drawLine(x + 17, y - 9, x + 22, y + 3, paint); c.drawLine(x + 22, y + 3, x + 9, y + 2, paint) }
-            DashboardIndicator.SIDE_STAND -> { c.drawLine(x - 20, y - 8, x + 16, y - 8, paint); c.drawLine(x - 4, y - 8, x + 8, y + 19, paint); c.drawLine(x + 2, y + 19, x + 20, y + 19, paint) }
+            DashboardIndicator.ENERGY_RECOVERY -> {
+                rect.set(x - 17, y - 13, x + 17, y + 13); c.drawRoundRect(rect, 5f, 5f, paint)
+                path.reset(); path.moveTo(x + 4, y - 8); path.lineTo(x - 5, y + 1); path.lineTo(x + 3, y + 1); path.lineTo(x - 4, y + 9); c.drawPath(path, paint)
+                rect.set(x - 25, y - 24, x + 25, y + 24); c.drawArc(rect, 35f, 285f, false, paint)
+                c.drawLine(x + 20, y - 12, x + 23, y - 1, paint); c.drawLine(x + 23, y - 1, x + 13, y - 3, paint)
+            }
+            DashboardIndicator.SIDE_STAND -> {
+                motorcycle(c, x, y - 3); c.drawLine(x + 1, y + 1, x + 10, y + 23, paint); c.drawLine(x + 4, y + 23, x + 20, y + 23, paint)
+            }
             DashboardIndicator.REPAIR_MODE -> {
-                c.drawLine(x - 15, y + 17, x + 8, y - 6, paint); c.drawArc(RectF(x - 1, y - 23, x + 23, y + 1), 10f, 250f, false, paint)
-                c.drawCircle(x - 15, y + 17, 3f, paint)
+                paint.strokeWidth = 5f
+                c.drawLine(x - 15, y + 17, x + 6, y - 4, paint)
+                rect.set(x - 1, y - 23, x + 23, y + 1); c.drawArc(rect, 20f, 260f, false, paint)
+                c.drawCircle(x - 15, y + 17, 4f, paint); paint.strokeWidth = 3f
             }
             DashboardIndicator.SEAT -> {
-                path.reset(); path.moveTo(x - 16, y - 16); path.lineTo(x - 12, y + 7); path.lineTo(x + 17, y + 7); path.lineTo(x + 20, y + 18); c.drawPath(path, paint)
-                c.drawLine(x - 21, y + 18, x + 14, y + 18, paint)
+                seat(c, x, y, true)
             }
             DashboardIndicator.RIDER_UNSEATED -> {
-                c.drawCircle(x, y - 14, 7f, paint); c.drawArc(RectF(x - 17, y - 3, x + 17, y + 27), 180f, 180f, false, paint)
-                text(c, "!", x + 23, y + 11, 23f, color, bold, Paint.Align.CENTER)
+                seat(c, x, y + 8, false)
+                c.drawLine(x, y - 25, x, y - 8, paint); c.drawLine(x - 7, y - 15, x, y - 8, paint); c.drawLine(x + 7, y - 15, x, y - 8, paint)
             }
             DashboardIndicator.CHARGING -> {
                 rect.set(x - 16, y - 8, x + 16, y + 9); c.drawRoundRect(rect, 4f, 4f, paint)

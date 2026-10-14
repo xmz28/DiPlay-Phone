@@ -25,7 +25,6 @@ internal class FusionDashboardPane(context: Context, private val main: () -> Uni
     fun setNightMode(value: Boolean) {
         night = value
         foreground.setNightMode(value)
-        setBackgroundColor(if (value) Color.rgb(3, 10, 17) else Color.rgb(232, 239, 246))
         themeButton.contentDescription = if (value) "切换到日间模式" else "切换到夜间模式"
         themeButton.tooltipText = themeButton.contentDescription
     }
@@ -66,6 +65,7 @@ internal class FusionDashboardPane(context: Context, private val main: () -> Uni
         addView(texture)
         addView(foreground, LayoutParams(-1, -1))
         addView(carplay); addView(homeButton); addView(themeButton)
+        foreground.onBackgroundChanged = { setBackgroundColor(it) }
         addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> layoutChildren() }
         refreshForeground()
         pageActive = false

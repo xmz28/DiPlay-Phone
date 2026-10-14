@@ -5,7 +5,7 @@ enum class DashboardIndicator(val label: String) {
     LEFT_TURN("左转向灯"), RIGHT_TURN("右转向灯"), HIGH_BEAM("远光灯"), LOW_BEAM("近光灯"),
     POSITION_LIGHT("位置灯"), VEHICLE_BLUETOOTH("车辆蓝牙"), PHONE_BLUETOOTH("手机蓝牙"),
     GPS("GPS 状态"), GSM("蜂窝网络状态"), FAULT("车辆故障"), ENERGY_RECOVERY("能量回收"),
-    READY("车辆就绪"), SIDE_STAND("侧撑状态"), REPAIR_MODE("维修模式"), SEAT("座椅状态"),
+    READY("车辆就绪"), SIDE_STAND("侧撑状态"), REPAIR_MODE("维修模式"), SEAT("座桶状态"),
     ABS("ABS 状态"), RIDER_UNSEATED("骑手未就座"), HDC("陡坡缓降"), CRUISE("巡航状态"),
     TCS("牵引力控制状态"), CHARGING("充电状态")
 }
