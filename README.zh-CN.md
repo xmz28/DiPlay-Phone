@@ -1,6 +1,23 @@
 # DiPlay
 
-> **本分支的手机适配：** 已整合上游 v0.2.11 及发布后 main 分支的更新（快照 `e6e7cc0`），保留此前在小米 Mi 10 / Android 11 上复测通过的四项修复：旋转重连使用稳定后的屏幕尺寸、CarPlay 尺寸设置实际生效、非 BYD 设备隐藏 BYD 返回图标，以及手机横屏首页和设置的紧凑布局。新增更新的组合效果仍需实机复测，步骤见[手机回归检查](docs/TESTING.md)。PR #6 的 Wi-Fi Direct 专项排查继续搁置，不包含在本次同步中。
+> **本分支的手机适配：** 基于 `v0.2.11-phone-fixes.2` 开展本地研究，保留旋转、显示尺寸和手机紧凑布局修复。普通手机新增可关闭的原生 Home 图标，默认返回 DiPlay 主界面并保留连接；比亚迪设备保留原有默认图案。原有手机回归步骤见[手机回归检查](docs/TESTING.md)。PR #6 的 Wi-Fi Direct 专项排查仍未纳入本次修改。
+
+## 本地研究版本（2026-10-14）
+
+已在 Redmi K30 5G / Android 13 上验证独立仪表地图流，并完成融合仪表演示：左侧速度环、顶部状态与导航条、底部电量和里程，右侧使用真实 CarPlay 副屏地图。进入 DiPlay 主界面的“融合仪表 · 演示预览”即可查看；音乐区域进入完整 CarPlay，Home 返回 DiPlay。车辆数值明确标记为演示值，尚未接入 CAN/BLE。
+
+这是 Android 接收端的本地融合显示，尚未实现完整 CarPlay Ultra 协议。地图样式由 iPhone 输出决定，副屏当前不转发触摸；不能将短时实测帧率视为长期稳定性保证。研究功能不需要 root 或系统悬浮窗权限。
+
+- [环境配置、编译与本地研究入口](docs/RESEARCH.zh-CN.md)
+- [融合仪表功能与限制](docs/FUSION_DASHBOARD.zh-CN.md)
+- [红米副屏地图实测记录](docs/CLUSTER_MAP_VERIFICATION.zh-CN.md)
+- [车辆仪表融合与后续接入方案](docs/YADEA_DISPLAY_PLAN.zh-CN.md)
+- [无线连接、握手与鉴权原理](docs/CARPLAY_WIRELESS_PROTOCOL.zh-CN.md)
+- [源码与本机支持文件的目录整理](docs/DIRECTORY_LAYOUT.zh-CN.md)
+
+源码工程与 `DiPlay-local-support` 支持目录独立存放。普通源码构建不含配件认证资源；本机研究构建通过外部目录显式配置，认证文件、APK 和本机缓存不提交到 Git。
+
+以下为上游公开预览版的说明，其车辆支持范围与本地研究功能应分别理解。
 
 为兼容的比亚迪安卓车机提供有线及无线 CarPlay，采用 DiAuto 风格界面。
 

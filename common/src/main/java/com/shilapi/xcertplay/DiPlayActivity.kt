@@ -195,6 +195,7 @@ class DiPlayActivity : ComponentActivity() {
         render()
         scheduleAutomaticVehicleValidation()
         handleWirelessRecovery()
+        handleClusterTestIntent()
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 if (page != "home") { page = "home"; render() }
@@ -209,6 +210,31 @@ class DiPlayActivity : ComponentActivity() {
         automaticVehicleValidationStarted = false
         scheduleAutomaticVehicleValidation()
         handleWirelessRecovery()
+        handleClusterTestIntent()
+    }
+    private fun handleClusterTestIntent() {
+        if (intent.getBooleanExtra("fusion_dashboard", false)) {
+            intent.removeExtra("fusion_dashboard")
+            openFusionDashboard()
+        } else if (intent.getBooleanExtra("cluster_test_reconnect", false)) {
+            intent.removeExtra("cluster_test_reconnect")
+            AirPlayPersistence.saveClusterMapEnabled(this, true)
+            connect(AirPlayPersistence.loadWirelessEnabled(this))
+        } else if (intent.getBooleanExtra("cluster_test", false)) {
+            intent.removeExtra("cluster_test")
+            startActivity(Intent(this, ClusterMapTestActivity::class.java))
+        }
+    }
+    private fun openFusionDashboard() {
+        if (!AirPlayPersistence.loadClusterMapEnabled(this)) {
+            AirPlayPersistence.saveClusterMapEnabled(this, true)
+            if (CarPlayBackgroundSession.hasSession()) {
+                toast("已启用副屏地图，重新连接后再打开融合仪表")
+                connect(AirPlayPersistence.loadWirelessEnabled(this))
+                return
+            }
+        }
+        startActivity(Intent(this, FusionDashboardActivity::class.java))
     }
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putString("page", page)
@@ -350,6 +376,9 @@ class DiPlayActivity : ComponentActivity() {
     }
 
     private fun home(content: LinearLayout) {
+        content.addView(button("融合仪表 · 演示预览", false) {
+            openFusionDashboard()
+        })
         if (isCompactLayout) {
             compactHome(content)
             return
@@ -556,6 +585,9 @@ class DiPlayActivity : ComponentActivity() {
                 setPadding(0, 0, 0, dp(18))
             })
             ambientLightThresholdControl(card)
+            card.addView(button("副屏地图验证（实验）", false) {
+                startActivity(Intent(this, ClusterMapTestActivity::class.java))
+            })
             nightDelaySettingControl(card, R.string.ambient_delay_title, R.string.ambient_delay_hint,
                 0..60, 2, R.string.ambient_delay_summary, { AirPlayPersistence.loadAmbientDelaySeconds(this) },
                 save = { AirPlayPersistence.saveAmbientDelaySeconds(this, it) })
@@ -829,9 +861,13 @@ class DiPlayActivity : ComponentActivity() {
             textSetting(card, R.string.model, { AirPlayPersistence.loadModel(this) }) {
                 AirPlayPersistence.saveModel(this, it)
             }
-            // OEM customization cannot turn the BYD tile back on for an ordinary phone.
-            if (Build.MANUFACTURER.startsWith("BYD", true) || Build.BRAND.startsWith("BYD", true) ||
-                Build.FINGERPRINT.startsWith("BYD-AUTO/", true) || BydOutputSettings.navigationAvailable(this)) {
+            toggle(card, getString(R.string.native_home_title), getString(R.string.native_home_hint),
+                AirPlayPersistence.loadNativeHomeEnabled(this)) {
+                AirPlayPersistence.saveNativeHomeEnabled(this, it)
+                render()
+                reconnectAfterSettingChange()
+            }
+            if (AirPlayPersistence.loadNativeHomeEnabled(this)) {
                 textSetting(card, R.string.oem_label, { AirPlayPersistence.loadOemLabel(this) }) {
                     AirPlayPersistence.saveOemLabel(this, it)
                 }

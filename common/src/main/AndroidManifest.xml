@@ -23,6 +23,12 @@
         </intent>
     </queries>
     <application>
+        <activity android:name="com.shilapi.xcertplay.FusionDashboardActivity"
+            android:exported="false" android:screenOrientation="landscape"
+            android:theme="@style/Theme.Xcertplay" />
+        <activity android:name="com.shilapi.xcertplay.ClusterMapTestActivity"
+            android:exported="false" android:screenOrientation="landscape"
+            android:theme="@style/Theme.Xcertplay" />
         <provider
             android:name="com.shilapi.xcertplay.DiagnosticReportProvider"
             android:authorities="${applicationId}.diagnostic-reports"

@@ -426,9 +426,22 @@ object AirPlayPersistence {
 
     fun loadOemLabel(context: Context): String =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getString(KEY_OEM_LABEL, DEFAULT_OEM_LABEL)
+            .getString(KEY_OEM_LABEL, defaultOemLabel())
             // iOS hides the car icon without a label.
-            .orEmpty().ifBlank { DEFAULT_OEM_LABEL }
+            .orEmpty().ifBlank { defaultOemLabel() }
+
+    private fun defaultOemLabel(): String = if (
+        Build.MANUFACTURER.startsWith("BYD", true) || Build.BRAND.startsWith("BYD", true) ||
+        Build.FINGERPRINT.startsWith("BYD-AUTO/", true)
+    ) DEFAULT_OEM_LABEL else "Home"
+
+    fun loadNativeHomeEnabled(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("native_home_enabled", true)
+
+    fun saveNativeHomeEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean("native_home_enabled", enabled).apply()
+    }
 
     fun saveOemLabel(context: Context, oemLabel: String) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()

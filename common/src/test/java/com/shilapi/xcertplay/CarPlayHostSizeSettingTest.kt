@@ -125,16 +125,31 @@ class CarPlayHostSizeSettingTest {
         assertTrue(DisplayDiagnosticSnapshot.report(activity).contains("not_enlarging"))
     }
 
-    @Test fun xiaomiMi10DoesNotAdvertiseTheBydReturnIcon() {
+    @Test fun xiaomiPhoneAdvertisesNativeHomeWithAPngIcon() {
         device("Xiaomi", "Xiaomi", "Xiaomi/umi/umi:11/RKQ1.200826.002/test-keys")
         select(CarPlaySize.MEDIUM)
-        assertEquals("BYD", AirPlayPersistence.loadOemLabel(activity))
+        assertEquals("Home", AirPlayPersistence.loadOemLabel(activity))
         val config = config()
-        assertTrue(config.icons.isEmpty())
+        assertEquals("Home", config.oemLabel)
+        assertEquals(192, config.icons.single().widthPixels)
+        assertTrue(config.icons.single().data.take(8).toByteArray().contentEquals(
+            byteArrayOf(0x89.toByte(), 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)))
         val info = AirPlayInfoPlist.build(config)
-        assertEquals(false, info["oemIconVisible"])
-        assertFalse(info.containsKey("oemIconLabel"))
-        assertFalse(info.containsKey("oemIcons"))
+        assertEquals(true, info["oemIconVisible"])
+        assertEquals("Home", info["oemIconLabel"])
+        assertTrue(info.containsKey("oemIcons"))
+    }
+
+    @Test fun nativeHomeCanBeDisabledAndKeepsCustomLabelWhenEnabled() {
+        device("Xiaomi", "Xiaomi", "test")
+        AirPlayPersistence.saveNativeHomeEnabled(activity, false)
+        select(CarPlaySize.MEDIUM)
+        assertTrue(config().icons.isEmpty())
+        assertEquals(false, AirPlayInfoPlist.build(config())["oemIconVisible"])
+        AirPlayPersistence.saveNativeHomeEnabled(activity, true)
+        AirPlayPersistence.saveOemLabel(activity, "DiPlay")
+        select(CarPlaySize.MEDIUM)
+        assertEquals("DiPlay", AirPlayInfoPlist.build(config())["oemIconLabel"])
     }
 
     @Test fun bydManufacturerBrandOrFirmwareRetainsTheReturnIcon() {
@@ -145,6 +160,7 @@ class CarPlayHostSizeSettingTest {
             Triple("unknown", "unknown", DiLink51ClusterLayout.FINGERPRINT),
         )) {
             device(manufacturer, brand, fingerprint)
+            select(CarPlaySize.MEDIUM)
             val config = config()
             assertEquals("BYD", config.oemLabel)
             assertTrue(config.icons.single().data.contentEquals(

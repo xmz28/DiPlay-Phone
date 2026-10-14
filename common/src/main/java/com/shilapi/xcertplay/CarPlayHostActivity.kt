@@ -3207,7 +3207,7 @@ class CarPlayHostActivity : ComponentActivity() {
             manufacturer = normalizedManufacturer(),
             model = normalizedModel(),
             oemLabel = oemLabel,
-            icons = if (hasBydCarUi()) listOf(loadAirPlayIcon()) else emptyList(),
+            icons = if (AirPlayPersistence.loadNativeHomeEnabled(this)) listOf(loadAirPlayIcon()) else emptyList(),
             videoInCar = com.shilapi.xcertplay.hud.BydOutputSettings.videoWhileParkedActive(this),
         )
     }
@@ -3243,9 +3243,28 @@ class CarPlayHostActivity : ComponentActivity() {
         return AirPlayIcon(bounds.outWidth, bounds.outHeight, encoded)
     }
 
-    private fun defaultAirPlayIconBytes(): ByteArray =
-        // Shown in CarPlay's app list as the "back to the car" button.
-        resources.openRawResource(R.raw.ic_car_home).use { it.readBytes() }
+    private fun defaultAirPlayIconBytes(): ByteArray {
+        if (hasBydCarUi()) return resources.openRawResource(R.raw.ic_car_home).use { it.readBytes() }
+        val bitmap = Bitmap.createBitmap(192, 192, Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(bitmap)
+        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+        paint.color = Color.rgb(35, 112, 225)
+        canvas.drawRoundRect(0f, 0f, 192f, 192f, 38f, 38f, paint)
+        paint.color = Color.WHITE
+        val house = android.graphics.Path().apply {
+            moveTo(35f, 91f); lineTo(96f, 40f); lineTo(157f, 91f)
+            lineTo(145f, 105f); lineTo(135f, 97f); lineTo(135f, 151f)
+            lineTo(108f, 151f); lineTo(108f, 117f); lineTo(84f, 117f)
+            lineTo(84f, 151f); lineTo(57f, 151f); lineTo(57f, 97f)
+            lineTo(47f, 105f); close()
+        }
+        canvas.drawPath(house, paint)
+        return java.io.ByteArrayOutputStream().use { output ->
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)
+            bitmap.recycle()
+            output.toByteArray()
+        }
+    }
 
     private fun updateAirPlayIconPreview() {
         val preview = iconPreviewView ?: return

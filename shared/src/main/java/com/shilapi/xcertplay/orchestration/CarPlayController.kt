@@ -309,14 +309,14 @@ class CarPlayController(
             uiListener?.onDeviceInfo(session, info)
         }
 
-        // The user tapped the car icon in CarPlay: show the head unit's own menu, like its Home button.
-        // The session keeps running in the background, so returning to DiPlay resumes CarPlay.
+        // The native OEM tile returns to DiPlay without tearing down the session.
         override fun onHostUiRequested(session: AirPlaySession) {
-            debugLog("CarPlay requested the car UI; opening the head-unit home screen")
+            debugLog("CarPlay requested the host UI; opening DiPlay home")
             runCatching {
                 appContext.startActivity(
-                    Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    Intent().setClassName(appContext.packageName, "com.shilapi.xcertplay.DiPlayActivity")
+                        .putExtra("page", "home")
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT),
                 )
             }.onFailure { debugLog("Car home screen could not open: ${it.javaClass.simpleName}") }
             uiListener?.onHostUiRequested(session)
