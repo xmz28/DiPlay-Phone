@@ -1,10 +1,12 @@
 # DiPlay 手机适配版
 
+本仓库公开手机融合仪表实验源码：[源码分支](https://github.com/xmz28/DiPlay-Phone/tree/research/android-baseline)。下方 `v0.2.11-phone-fixes.2` 下载链接为基础手机适配版，不包含新增融合仪表功能。
+
 将 Android 手机用作 CarPlay 接收端。这个分支基于 [DiPlay](https://github.com/shihabal3amri/DiPlay)，针对手机屏幕、横屏布局、设置入口和屏幕方向进行适配。
 
 目前的实际测试设备是 **小米 Mi 10 / Android 11**，配合 **iPhone 16 Pro Max / iOS 18.7.8**。当前成功使用的连接方式是 Android 手机个人热点；Wi-Fi Direct 在这套设备上仍未解决。其他手机组合需要各自验证。
 
-[下载手机适配版](https://github.com/ZedingZhang/DiPlay-Phone/releases/tag/v0.2.11-phone-fixes.2) · [全部 Release](https://github.com/ZedingZhang/DiPlay-Phone/releases) · [修复记录与讨论](https://github.com/ZedingZhang/DiPlay-Phone/pulls) · [实机复测清单](docs/TESTING.md)
+[下载手机适配版](https://github.com/ZedingZhang/DiPlay-Phone/releases/tag/v0.2.11-phone-fixes.2) · [全部 Release](https://github.com/ZedingZhang/DiPlay-Phone/releases) · [修复记录与讨论](https://github.com/xmz28/DiPlay-Phone/pulls) · [实机复测清单](docs/TESTING.md)
 
 ## Fusion dashboard experimental source (2026-10-14)
 
@@ -76,7 +78,7 @@ f42ace8b25e64b63adbe54aa67c8249b8fddb83930d6dc2ec5606a5e9e70bd25
 
 复现问题后，进入 **设置 → 诊断 → 保存诊断报告**。Android 10 及以上保存到 **Downloads/DiPlay**。反馈时附上 Android 手机型号及系统、iPhone 型号及 iOS、应用版本、连接方式、复现步骤和失败时间；旋转问题还应说明当时的页面及旋转前后的方向。请先检查日志内容，移除不希望公开的信息和热点密码。报告不会自动上传。
 
-仓库当前未启用 Issues，可在已有的 [修复 PR 讨论](https://github.com/ZedingZhang/DiPlay-Phone/pulls) 中反馈相关问题。
+仓库当前未启用 Issues，可在已有的 [修复 PR 讨论](https://github.com/xmz28/DiPlay-Phone/pulls) 中反馈相关问题。
 
 ## 源码、构建与上游
 
