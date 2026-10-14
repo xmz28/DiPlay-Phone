@@ -519,6 +519,13 @@ class DiPlayActivity : ComponentActivity() {
         content.addView(label(getString(R.string.apply_reconnects_carplay_for_size_resolution_music_buffer), 17, MUTED).apply {
             setPadding(0, dp(if (compactSettings) 0 else 8), 0, dp(if (compactSettings) 10 else 24))
         })
+        section(content, "融合仪表显示", R.drawable.ic_dp_display) { card ->
+            choice(card, "显示比例预设", FusionDisplayPreset.entries.map { it.label },
+                FusionDisplayPreset.load(this).ordinal, reconnects = false) {
+                FusionDisplayPreset.save(this, FusionDisplayPreset.entries[it])
+            }
+            card.addView(label("2:1 按完整手机屏幕居中，适合镜像到 960×480 仪表。电压、电流仍为演示数据。", 14, MUTED))
+        }
         section(content, getString(R.string.carplay_controls), R.drawable.ic_dp_display) { card ->
             val gestureFingers = listOf(2, 3, 4)
             choice(card, getString(R.string.settings_gesture_fingers_label),

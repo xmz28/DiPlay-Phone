@@ -30,6 +30,7 @@ internal class FusionDashboardPane(context: Context, private val main: () -> Uni
     }
     private fun refreshForeground() {
         foreground.setIndicators(indicatorSource.snapshot())
+        foreground.setMedia(CarPlayMediaKeys.dashboardSnapshot())
         foreground.update(CarPlayGlance.snapshot(), MapMirrors.streamActive)
     }
     var ready = false

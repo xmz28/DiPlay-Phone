@@ -7,6 +7,15 @@ import android.view.Surface
 
 /** A fixed request survives a trip to the freely rotating settings activity. */
 internal object CarPlayOrientation {
+    fun allowLandscapeFlip(orientation: Int): Int = when (orientation) {
+        ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE, ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        else -> orientation
+    }
+
+    fun rotationCompatible(expected: Int?, actual: Int, orientation: Int?): Boolean =
+        expected == null || expected == actual ||
+            (orientation == ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE && (expected + 2) % 4 == actual)
+
     @Suppress("DEPRECATION")
     fun capture(activity: Activity, rotation: Int): Int {
         val display = activity.windowManager.defaultDisplay

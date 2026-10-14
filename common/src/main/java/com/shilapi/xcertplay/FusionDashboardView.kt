@@ -16,7 +16,7 @@ import java.util.Locale
 /** Local foreground only: the live map remains a separate hardware decoded texture. */
 internal class FusionDashboardView(context: Context) : View(context) {
     data class VehiclePreview(val speed: Int = 48, val gear: String = "D", val power: String = "2.6",
-        val battery: Int = 78, val range: Int = 62, val odometer: String = "1,186")
+        val battery: Int = 78, val voltage: String = "72.8", val current: String = "35.7", val range: Int = 62, val odometer: String = "1,186")
 
     private val vehicle = VehiclePreview()
     private var indicators = DemoDashboardIndicators.snapshot()
@@ -57,6 +57,8 @@ internal class FusionDashboardView(context: Context) : View(context) {
     }
     private var glance = CarPlayGlance.Snapshot()
     private var mapActive = false
+    private var media = CarPlayMediaKeys.DashboardMedia(com.shilapi.xcertplay.media.CarPlayNowPlaying(), null)
+    fun setMedia(value: CarPlayMediaKeys.DashboardMedia) { media = value }
     private var blink = false
     private var clock = ""
     private val formatter = SimpleDateFormat("HH:mm", Locale.getDefault())
@@ -65,6 +67,7 @@ internal class FusionDashboardView(context: Context) : View(context) {
     private val blue = Color.rgb(16, 157, 255)
     private var green = Color.rgb(28, 233, 100)
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val artworkPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply { alpha = 255 }
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val regular = Typeface.create("sans-serif", Typeface.NORMAL)
     private val medium = Typeface.create("sans-serif-medium", Typeface.NORMAL)
@@ -156,16 +159,13 @@ internal class FusionDashboardView(context: Context) : View(context) {
         text(canvas, "${vehicle.power} kW", 339f, 643f, 42f, white, regular, Paint.Align.CENTER)
         canvas.restore()
 
-        glass(canvas, 1030f, 8f, 1860f, 109f, 48f)
         if (glance.maneuverType != null) {
+            glass(canvas, 1030f, 8f, 1860f, 109f, 48f)
             glyph?.let { it.setBounds(1058, 30, 1119, 88); it.draw(canvas) }
             val distance = if (glance.distanceMeters < 1000) "${glance.distanceMeters} m"
                 else String.format(Locale.US, "%.1f km", glance.distanceMeters / 1000.0)
             text(canvas, distance, 1140f, 72f, 47f, white, medium)
             text(canvas, shorten(glance.road.ifBlank { "沿导航路线行驶" }, 18), 1370f, 69f, 32f, white)
-        } else {
-            text(canvas, if (mapActive) "CarPlay 导航地图" else "等待 CarPlay 地图", 1070f, 53f, 33f, white, medium)
-            text(canvas, if (glance.connected) "在 iPhone 上开始导航" else "连接 iPhone 后显示实时地图", 1070f, 87f, 24f, muted)
         }
         if (!mapActive) {
             text(canvas, "地图连接中", 1390f, logicalHeight / 2 - 20f, 42f, white, medium, Paint.Align.CENTER)
@@ -175,22 +175,45 @@ internal class FusionDashboardView(context: Context) : View(context) {
         canvas.save()
         canvas.translate(0f, logicalHeight - 864f)
         glass(canvas, 10f, 722f, 1910f, 850f, 52f)
-        paint.color = Color.rgb(245, 44, 112)
-        rect.set(53f, 753f, 125f, 823f); canvas.drawRoundRect(rect, 19f, 19f, paint)
-        text(canvas, "♫", 89f, 806f, 52f, Color.WHITE, medium, Paint.Align.CENTER)
-        text(canvas, shorten(glance.song ?: "打开 CarPlay", 11), 154f, 786f, 30f, white, medium)
-        text(canvas, if (glance.song != null) if (glance.playing) "正在播放  ›" else "已暂停  ›" else "应用与音乐  ›", 154f, 816f, 23f, muted)
-        battery(canvas, 505f, 770f)
-        text(canvas, "电量", 611f, 797f, 28f, muted)
-        text(canvas, "${vehicle.battery}%", 685f, 798f, 40f, white, medium)
-        line(canvas, 842f, 755f, 842f, 818f)
-        text(canvas, "续航", 913f, 797f, 28f, muted)
-        text(canvas, "${vehicle.range}", 989f, 798f, 40f, white, medium)
-        text(canvas, "km", 1051f, 797f, 27f, muted)
-        line(canvas, 1182f, 755f, 1182f, 818f)
-        text(canvas, "里程", 1250f, 797f, 28f, muted)
-        text(canvas, vehicle.odometer, 1329f, 798f, 40f, white, medium)
-        text(canvas, "km", 1449f, 797f, 27f, muted)
+        rect.set(53f, 750f, 125f, 822f)
+        val cover = media.artwork?.takeUnless { it.isRecycled }
+        if (cover != null) {
+            canvas.save()
+            path.reset(); path.addRoundRect(rect, 17f, 17f, Path.Direction.CW); canvas.clipPath(path)
+            val side = minOf(cover.width, cover.height)
+            val left = (cover.width - side) / 2; val top = (cover.height - side) / 2
+            canvas.drawBitmap(cover, Rect(left, top, left + side, top + side), rect, artworkPaint)
+            canvas.restore()
+        } else {
+            paint.color = Color.rgb(245, 44, 112); canvas.drawRoundRect(rect, 19f, 19f, paint)
+            text(canvas, "♫", 89f, 806f, 52f, Color.WHITE, medium, Paint.Align.CENTER)
+        }
+        val song = media.info.title?.takeIf { it.isNotBlank() } ?: glance.song
+        val artist = media.info.artist?.takeIf { it.isNotBlank() }
+        text(canvas, shorten(song ?: "打开 CarPlay", 10), 154f, 779f, 29f, white, medium)
+        text(canvas, shorten(artist ?: if (song != null) if (media.info.playing || glance.playing) "正在播放" else "已暂停" else "应用与音乐  ›", 13), 154f, 809f, 22f, muted)
+        val duration = media.info.durationMillis ?: 0L
+        if (duration > 0L) {
+            paint.color = themed(Color.rgb(184, 201, 215), Color.rgb(34, 52, 68))
+            rect.set(154f, 820f, 437f, 824f); canvas.drawRoundRect(rect, 2f, 2f, paint)
+            paint.color = blue
+            rect.right = 154f + 283f * ((media.info.elapsedMillis ?: 0L).toFloat() / duration).coerceIn(0f, 1f)
+            canvas.drawRoundRect(rect, 2f, 2f, paint)
+        }
+        battery(canvas, 480f, 770f)
+        text(canvas, "电量", 565f, 777f, 23f, muted)
+        text(canvas, "${vehicle.battery}%", 565f, 811f, 34f, white, medium)
+        line(canvas, 680f, 755f, 680f, 818f)
+        text(canvas, "电压", 711f, 777f, 23f, muted)
+        text(canvas, "${vehicle.voltage} V", 711f, 811f, 32f, white, medium)
+        text(canvas, "电流", 864f, 777f, 23f, muted)
+        text(canvas, "${vehicle.current} A", 864f, 811f, 32f, white, medium)
+        line(canvas, 1020f, 755f, 1020f, 818f)
+        text(canvas, "续航", 1052f, 777f, 23f, muted)
+        text(canvas, "${vehicle.range} km", 1052f, 811f, 32f, white, medium)
+        line(canvas, 1225f, 755f, 1225f, 818f)
+        text(canvas, "里程", 1260f, 777f, 23f, muted)
+        text(canvas, "${vehicle.odometer} km", 1260f, 811f, 32f, white, medium)
         themeIcon(canvas, 1640f, 773f)
         text(canvas, if (night) "夜间" else "日间", 1640f, 826f, 25f, muted, regular, Paint.Align.CENTER)
         house(canvas, 1797f, 773f)

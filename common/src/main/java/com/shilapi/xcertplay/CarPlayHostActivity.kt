@@ -283,6 +283,33 @@ class CarPlayHostActivity : ComponentActivity() {
     private var controller: CarPlayController? = null
     private var currentSurface: Surface? = null
     private var fusionPane: FusionDashboardPane? = null
+    private var fusionRoot: FrameLayout? = null
+
+    private fun applyFusionOrientation() {
+        if (FusionDisplayPreset.load(this) != FusionDisplayPreset.CLUSTER_2_1) return
+        if (requestedOrientation == android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE) return
+        val metrics = android.util.DisplayMetrics()
+        @Suppress("DEPRECATION")
+        windowManager.defaultDisplay.getRealMetrics(metrics)
+        lockedCarPlayRotation = if (metrics.widthPixels < metrics.heightPixels) Surface.ROTATION_90 else displayRotation()
+        lockedCarPlayOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        requestedOrientation = lockedCarPlayOrientation!!
+    }
+
+    private fun applyFusionPreset() {
+        val root = fusionRoot ?: return
+        val pane = fusionPane ?: return
+        if (root.width == 0 || root.height == 0) return
+        val metrics = android.util.DisplayMetrics()
+        @Suppress("DEPRECATION")
+        windowManager.defaultDisplay.getRealMetrics(metrics)
+        val origin = IntArray(2); root.getLocationOnScreen(origin)
+        val area = fusionDisplayRect(root.width, root.height, metrics.widthPixels, metrics.heightPixels,
+            origin[0], origin[1], FusionDisplayPreset.load(this))
+        val old = pane.layoutParams as FrameLayout.LayoutParams
+        if (old.width == area.width() && old.height == area.height() && old.leftMargin == area.left && old.topMargin == area.top) return
+        pane.layoutParams = FrameLayout.LayoutParams(area.width(), area.height()).apply { leftMargin = area.left; topMargin = area.top }
+    }
     private var fusionSelected = false
     private var pageAnimating = false
     private var waitingForFusion = false
@@ -291,6 +318,7 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun showDisplayPage(fusion: Boolean, waitForFrame: Boolean = true) {
         val pane = fusionPane ?: return
+        applyFusionPreset()
         if (pageAnimating || fusion == fusionSelected) return
         controller?.sendTouch(emptyList())
         if (fusion && waitForFrame && MapMirrors.streamActive && !pane.ready) {
@@ -723,7 +751,9 @@ class CarPlayHostActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        fusionRoot?.post { applyFusionPreset() }
         displayResizePaused = false
+        applyFusionOrientation()
         lockedCarPlayOrientation?.let { requestedOrientation = it }
         val savedNightMode = AirPlayPersistence.loadCarPlayNightMode(this)
         val savedThreshold = AirPlayPersistence.loadAmbientLightThreshold(this)
@@ -1146,6 +1176,12 @@ class CarPlayHostActivity : ComponentActivity() {
         }, { toggleFusionTheme() }).apply { alpha = .001f; setNightMode(darkMode) }
         fusionPane = fusion
         root.addView(fusion, FrameLayout.LayoutParams(-1, -1))
+        fusionRoot = root
+        root.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> applyFusionPreset() }
+        ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
+            view.post { applyFusionPreset() }
+            insets
+        }
         // Measure the preparation content naturally, then fit it inside the safe viewport.
         val viewport = object : FrameLayout(this) {
             override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -3853,7 +3889,7 @@ class CarPlayHostActivity : ComponentActivity() {
     private fun displayRotation(): Int = videoView?.display?.rotation ?: windowManager.defaultDisplay.rotation
 
     private fun canApplyDisplaySize(): Boolean = !displayResizePaused &&
-        (lockedCarPlayRotation == null || lockedCarPlayRotation == displayRotation())
+        CarPlayOrientation.rotationCompatible(lockedCarPlayRotation, displayRotation(), lockedCarPlayOrientation)
 
     private fun restoreCarPlayOrientation(savedInstanceState: Bundle?) {
         val retained = CarPlayBackgroundSession.snapshot()?.display
@@ -3863,12 +3899,14 @@ class CarPlayHostActivity : ComponentActivity() {
         lockedCarPlayOrientation = if (savedInstanceState?.containsKey(STATE_CARPLAY_ORIENTATION) == true) {
             savedInstanceState.getInt(STATE_CARPLAY_ORIENTATION)
         } else retained?.lockedOrientation ?: CarPlayOrientation.capture(this, lockedCarPlayRotation!!)
+        lockedCarPlayOrientation = CarPlayOrientation.allowLandscapeFlip(lockedCarPlayOrientation!!)
         requestedOrientation = lockedCarPlayOrientation!!
+        applyFusionOrientation()
     }
 
     private fun displayLayoutChanged(newSize: DisplaySize? = activeDisplaySize): Boolean {
         val display = sessionDisplay ?: return false
-        if (display.rotation != displayRotation()) return true
+        if (!CarPlayOrientation.rotationCompatible(display.rotation, displayRotation(), lockedCarPlayOrientation)) return true
         if (display.hideTopBar != hideTopBar || display.hideBottomBar != hideBottomBar) return true
         if (newSize != null && newSize.width > 0 && newSize.height > 0) {
             val baseAspect = display.width.toDouble() / display.height
