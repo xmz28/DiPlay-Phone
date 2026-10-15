@@ -1,5 +1,13 @@
 # Unreleased
 
+## 2026-10-15 — Fusion BLE Debug 3
+
+- Add explicitly estimated SOC × 0.85 km range, with unknown handling for invalid battery data.
+- Render the visible dashboard on vsync at a target 60 Hz, with causal 45 ms speed / 60 ms power-arc transitions; stop when hidden. Telemetry remains 20 Hz.
+- Thicken status icons and match gear colours to the ESP32 instrument; wire gear 4 is FREE, not push mode.
+- Retain package/signing; increment the Android debug version to 0.2.11-fusion-ble-debug.3 (32). ESP32 v0.1.8 remains compatible.
+
+
 ## 2026-10-15 — Fusion BLE Debug 2
 
 - Add optional ESP32 BLE vehicle telemetry with explicit device binding, timeout fallback and electrical freshness checks. Companion firmware: ESP32 Vehicle Dashboard v0.1.8.

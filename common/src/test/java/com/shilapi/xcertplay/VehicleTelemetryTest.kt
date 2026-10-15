@@ -95,4 +95,27 @@ class VehicleTelemetryTest {
         assertTrue(result.indicators.signal(DashboardIndicator.TCS).blinking)
         assertTrue(result.indicators.signal(DashboardIndicator.ABS).blinking)
     }
+    @Test fun estimatedRangeIsSocHeuristicAndKeepsUnknownUnknown() {
+        assertEquals(85, dashboardEstimatedRangeKm(100))
+        assertEquals(66, dashboardEstimatedRangeKm(78))
+        assertEquals(0, dashboardEstimatedRangeKm(0))
+        assertNull(dashboardEstimatedRangeKm(null))
+        assertNull(dashboardEstimatedRangeKm(101))
+        val connected = VehicleState(connectionStatus = ConnectionStatus.CONNECTED,
+            vehicle = VehicleSnapshot(batteryPercent = 80, batteryValid = true))
+        assertEquals(68, vehicleDashboardSnapshot(connected, true).vehicle.range)
+        assertNull(vehicleDashboardSnapshot(connected.copy(vehicle = connected.vehicle.copy(batteryValid = false)), true).vehicle.range)
+    }
+    @Test fun freeGearUsesWireValueFourAndColoursMatchBoard() {
+        val free = vehicleDashboardSnapshot(rt("""{"t":"rt","z":2,"g":4}"""), true)
+        assertEquals("FREE", free.vehicle.gear)
+        assertEquals(4, GearState.FREE.ordinal)
+        assertEquals(0xff0000ff.toInt(), dashboardGearColor(free.vehicle.gear))
+        assertEquals(0xff00ff00.toInt(), dashboardGearColor("ECO"))
+        assertEquals(0xffff6500.toInt(), dashboardGearColor("S"))
+        assertEquals(0xffffffff.toInt(), dashboardGearColor("A"))
+        assertEquals(0xffff0000.toInt(), dashboardGearColor("T"))
+        assertEquals(0xffffff00.toInt(), dashboardGearColor("P"))
+    }
+
 }

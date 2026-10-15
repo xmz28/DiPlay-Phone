@@ -26,7 +26,7 @@ internal fun vehicleDashboardSnapshot(state: VehicleState, enabled: Boolean): Ve
             GearState.ECONOMY -> "ECO"
             GearState.SPORT -> "S"
             GearState.T -> "T"
-            GearState.PUSH -> "推行"
+            GearState.FREE -> "FREE"
         }
     }
     val i = state.icons
@@ -59,8 +59,8 @@ internal fun vehicleDashboardSnapshot(state: VehicleState, enabled: Boolean): Ve
             speed = v.speedKmh.takeIf { v.speedValid }, gear = gear, power = power, powerKw = v.displayPowerKw,
             battery = v.batteryPercent.takeIf { v.batteryValid },
             voltage = decimal(v.voltageV, v.voltageValid), current = decimal(v.currentA, v.currentValid),
-            // No range estimate is supplied by this protocol. Odometer is ESP32's speed integration.
-            range = null, odometer = if (v.odoValid && v.odoKm != null) String.format(Locale.US, "%,.1f", v.odoKm) else "--",
+            // Heuristic range from SOC only; odometer remains ESP32 speed integration.
+            range = dashboardEstimatedRangeKm(v.batteryPercent.takeIf { v.batteryValid }), odometer = if (v.odoValid && v.odoKm != null) String.format(Locale.US, "%,.1f", v.odoKm) else "--",
         ), DashboardIndicatorSnapshot(signals, demonstration = false),
     )
 }

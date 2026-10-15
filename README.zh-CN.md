@@ -4,7 +4,13 @@
 
 本分支为 `xmz28/DiPlay-Phone` 的 `research/android-baseline`，基于 [ZedingZhang 的手机适配版](https://github.com/ZedingZhang/DiPlay-Phone)继续修改。以下说明对应本分支的融合仪表版本。
 
-[下载融合仪表 Debug APK](https://github.com/xmz28/DiPlay-Phone/releases/tag/v0.2.11-fusion-debug.2) · [本仓库全部 Release](https://github.com/xmz28/DiPlay-Phone/releases) · [源码与讨论](https://github.com/xmz28/DiPlay-Phone/pull/1)
+[下载融合仪表 Debug APK](https://github.com/xmz28/DiPlay-Phone/releases/tag/v0.2.11-fusion-debug.3) · [本仓库全部 Release](https://github.com/xmz28/DiPlay-Phone/releases) · [源码与讨论](https://github.com/xmz28/DiPlay-Phone/pull/1)
+
+## 装车反馈修正（Debug 3）
+
+新增电量 × 0.85 的估算续航、速度 45 ms / 功率圈 60 ms 的短过渡、VSync 目标 60 Hz 显示、加粗指示灯和正确的 FREE 挡位及配色。BLE 遥测保持 20 Hz，真实数据未变时数字不强制变化。本轮 Android 显示调整兼容 ESP32 v0.1.8，无需重刷 ESP32。[实现与验证说明](docs/ROAD_TEST_DISPLAY_REFINEMENT.zh-CN.md)。
+
+本次 Debug 3 已在红米覆盖安装验证：稳定统计窗口的 Android 仪表前景绘制约 59.8～59.9 FPS，平均绘制记录耗时约 1.8 ms。遥测采样仍为 20 Hz，不能据此宣称外置镜像屏或 CarPlay 地图视频也达到 60 FPS。
 
 ## 本分支新增功能
 
@@ -17,7 +23,7 @@
 - **仪表视觉调整**：自绘状态指示灯、地图边缘渐隐、速度环与底栏布局，改善小屏可读性。
 - **保留手机适配**：紧凑设置页面、显示尺寸设置、方向处理、音乐、诊断和现有连接功能。
 
-支持通过 ESP32 BLE 接收车辆速度、挡位、电量、电压、电流、功率和指示灯。电气数据有效时用电压 × 电流计算功率，保留回收负功率；里程由 ESP32 按速度累计，不是车辆原厂总里程。协议不提供续航，实时连接时续航显示“--”。未连接、关闭 BLE 或状态超时 3 秒时恢复演示模式，已连接但无效的字段显示“--”。副屏地图暂不转发触摸，尚未实现完整 CarPlay Ultra 协议。
+支持通过 ESP32 BLE 接收车辆速度、挡位、电量、电压、电流、功率和指示灯。电气数据有效时用电压 × 电流计算功率，保留回收负功率；里程由 ESP32 按速度累计，不是车辆原厂总里程。协议不提供真实续航，本分支按有效电量 × 0.85 显示“估算续航”，电量无效则显示未知。未连接、关闭 BLE 或状态超时 3 秒时恢复演示模式，已连接但无效的字段显示“--”。副屏地图暂不转发触摸，尚未实现完整 CarPlay Ultra 协议。
 
 ## 配套 ESP32 项目
 
@@ -27,14 +33,14 @@
 
 ## 下载与安装
 
-从[本分支 Release](https://github.com/xmz28/DiPlay-Phone/releases/tag/v0.2.11-fusion-debug.2) 下载 `DiPlay-fusion-ble-debug.apk`，安装到 Android 手机上。发布的是带运行时认证资源的 **debug APK，使用本机 debug 签名**。
+从[本分支 Release](https://github.com/xmz28/DiPlay-Phone/releases/tag/v0.2.11-fusion-debug.3) 下载 `DiPlay-fusion-ble-debug.apk`，安装到 Android 手机上。发布的是带运行时认证资源的 **debug APK，使用本机 debug 签名**。
 
 | 项目 | 本次融合仪表 Debug 包 |
 | --- | --- |
-| Release 标签 | `v0.2.11-fusion-debug.2` |
+| Release 标签 | `v0.2.11-fusion-debug.3` |
 | Android 包名 | `com.shihab.diplay.hudtest` |
-| APK 内版本名 | `0.2.11-fusion-ble-debug.2` |
-| versionCode | `31` |
+| APK 内版本名 | `0.2.11-fusion-ble-debug.3` |
+| versionCode | `32` |
 | 构建类型 | debug |
 | 校验和及源码提交 | Release 附件 `SHA256SUMS.txt`、`SOURCE.txt` |
 
@@ -55,7 +61,7 @@ ZedingZhang 的 [`v0.2.11-phone-fixes.2`](https://github.com/ZedingZhang/DiPlay-
 
 融合仪表研究记录使用 **Redmi K30 5G / Android 13**，配合 **iPhone 15 Pro / iOS 26.7**；已验证真实副屏地图、歌曲封面与进度、2:1 布局及双向横屏。具体实机记录见下方文档。基础版的小米测试与本分支红米测试分别记录，不等同于所有手机或车辆面板通过验收。
 
-2026-10-15 的车辆协议、BLE 分片/超时、功率圈、分方向主题及显示预设共 27 项定向测试通过。板端演示数据与 CarPlay 地图并行验证记录包含正负电流、计算功率和 ESP32 复位重连；尚未接实车，不视为 CAN/RS485 实车采样或长期稳定性验收。完整测试套件尚未完成；不沿用基础版 932 项测试结果作为本分支结果。本次 mobile lint 与 standalone debug 构建通过，lint 为 18 个警告、无错误；APK 签名与上一融合仪表版本一致，认证资源及 ARM64 库校验通过。完整结果见 Release 说明。
+2026-10-15 的车辆协议、BLE 分片/超时、功率圈、分方向主题、显示缓冲和显示预设共 36 项定向测试通过。板端演示数据与 CarPlay 地图并行验证记录包含正负电流、计算功率和 ESP32 复位重连；尚未接实车，不视为 CAN/RS485 实车采样或长期稳定性验收。完整测试套件尚未完成；不沿用基础版 932 项测试结果作为本分支结果。本次 mobile lint 与 standalone debug 构建通过，lint 为 18 个警告、无错误；APK 签名与上一融合仪表版本一致，认证资源及 ARM64 库校验通过。完整结果见 Release 说明。
 
 ## 文档
 

@@ -117,9 +117,9 @@ fun Int.toGearState(): GearState {
         1 -> GearState.ECONOMY
         2 -> GearState.SPORT
         3 -> GearState.T
-        4 -> GearState.PUSH
+        4 -> GearState.FREE
         else -> GearState.P
     }
 }
 
-enum class GearState { P, ECONOMY, SPORT, T, PUSH }
+enum class GearState { P, ECONOMY, SPORT, T, FREE }

@@ -16,10 +16,23 @@ import java.util.Locale
 /** Local foreground only: the live map remains a separate hardware decoded texture. */
 internal class FusionDashboardView(context: Context) : View(context) {
     data class VehiclePreview(val speed: Int? = 48, val gear: String = "D", val power: String = "2.6",
-        val battery: Int? = 78, val voltage: String = "72.8", val current: String = "35.7", val range: Int? = 62, val odometer: String = "1,186", val powerKw: Double? = 2.6)
+        val battery: Int? = 78, val voltage: String = "72.8", val current: String = "35.7", val range: Int? = 66, val odometer: String = "1,186", val powerKw: Double? = 2.6)
 
     private var vehicle = VehiclePreview()
-    fun setVehicle(value: VehiclePreview) { vehicle = value }
+    private val speedDisplay = DashboardDisplayValue(45, snapZero = true).apply { retarget(48.0, 0, true) }
+    private val powerDisplay = DashboardDisplayValue(60, resetOnSignChange = true).apply { retarget(2.6, 0, true) }
+    private var frameNs = System.nanoTime()
+    fun setVehicle(value: VehiclePreview, nowNs: Long = System.nanoTime(), snap: Boolean = false) {
+        vehicle = value
+        speedDisplay.retarget(value.speed?.toDouble(), nowNs, snap)
+        powerDisplay.retarget(value.powerKw, nowNs, snap)
+    }
+    fun renderFrame(nowNs: Long) { frameNs = nowNs; invalidate() }
+    private var drawWindowNs = 0L
+    private var drawCount = 0
+    private var drawCostNs = 0L
+    private var drawMaxNs = 0L
+    fun resetFrameMetrics() { drawWindowNs = 0; drawCount = 0; drawCostNs = 0; drawMaxNs = 0 }
     private var indicators = DemoDashboardIndicators.snapshot()
     private var night = true
     private var mapNight = true
@@ -161,6 +174,8 @@ internal class FusionDashboardView(context: Context) : View(context) {
     }
 
     override fun onDraw(canvas: Canvas) {
+        val measure = android.util.Log.isLoggable("DiPlayRender", android.util.Log.DEBUG)
+        val drawStartedNs = if (measure) System.nanoTime() else 0L
         canvas.save()
         canvas.scale(width / 1920f, width / 1920f)
         paint.shader = null; paint.style = Paint.Style.FILL
@@ -187,7 +202,7 @@ internal class FusionDashboardView(context: Context) : View(context) {
         paint.color = themed(Color.rgb(184, 201, 215), Color.rgb(17, 32, 44))
         rect.set(76f, 140f, 602f, 666f)
         canvas.drawArc(rect, 140f, 260f, false, paint)
-        val powerRing = dashboardPowerRing(vehicle.powerKw)
+        val powerRing = dashboardPowerRing(powerDisplay.sample(frameNs))
         val powerSweep = 260f * powerRing.fraction
         val accent = if (powerRing.recovery) Color.rgb(28, 233, 100) else Color.rgb(85, 197, 255)
         paint.color = Color.WHITE; paint.shader = if (powerRing.recovery) recoveryArcShader else speedArcShader
@@ -201,10 +216,10 @@ internal class FusionDashboardView(context: Context) : View(context) {
         rect.set(61f, 125f, 617f, 681f)
         canvas.drawArc(rect, 140f, powerSweep, false, paint)
         paint.strokeCap = Paint.Cap.BUTT; paint.style = Paint.Style.FILL
-        text(canvas, (vehicle.speed?.toString() ?: "--"), 339f, 409f, 224f, white, bold, Paint.Align.CENTER)
+        text(canvas, (speedDisplay.sample(frameNs)?.let { kotlin.math.round(it).toInt().toString() } ?: "--"), 339f, 409f, 224f, white, bold, Paint.Align.CENTER)
         text(canvas, "km/h", 339f, 461f, 42f, muted, regular, Paint.Align.CENTER)
         line(canvas, 155f, 502f, 523f, 502f)
-        text(canvas, vehicle.gear, 339f, 577f, 68f, white, medium, Paint.Align.CENTER)
+        text(canvas, vehicle.gear, 339f, 577f, 68f, dashboardGearColor(vehicle.gear), medium, Paint.Align.CENTER)
         text(canvas, "${vehicle.power} kW", 339f, 643f, 42f, white, regular, Paint.Align.CENTER)
         canvas.restore()
 
@@ -258,7 +273,7 @@ internal class FusionDashboardView(context: Context) : View(context) {
         text(canvas, "电流", 864f, 775f, 28f, muted)
         text(canvas, "${vehicle.current} A", 864f, 814f, 36f, white, medium)
         line(canvas, 1020f, 755f, 1020f, 818f)
-        text(canvas, "续航", 1052f, 775f, 28f, muted)
+        text(canvas, "估算续航", 1052f, 775f, 28f, muted)
         text(canvas, "${vehicle.range ?: "--"} km", 1052f, 814f, 40f, white, medium)
         line(canvas, 1225f, 755f, 1225f, 818f)
         text(canvas, "里程", 1260f, 775f, 28f, muted)
@@ -275,6 +290,17 @@ internal class FusionDashboardView(context: Context) : View(context) {
         text(canvas, "主页", 1797f, 826f, 25f, muted, regular, Paint.Align.CENTER)
         canvas.restore()
         canvas.restore()
+        if (measure) {
+            val end = System.nanoTime()
+            if (drawWindowNs == 0L) drawWindowNs = drawStartedNs
+            drawCount++; drawCostNs += end - drawStartedNs
+            drawMaxNs = maxOf(drawMaxNs, end - drawStartedNs)
+            if (end - drawWindowNs >= 5_000_000_000L) {
+                android.util.Log.d("DiPlayRender", "foregroundDrawFps=%.1f meanDrawMs=%.2f maxDrawMs=%.2f".format(Locale.US,
+                    drawCount * 1e9 / (end - drawWindowNs), drawCostNs / 1e6 / drawCount, drawMaxNs / 1e6))
+                drawWindowNs = end; drawCount = 0; drawCostNs = 0; drawMaxNs = 0
+            }
+        } else { drawWindowNs = 0; drawCount = 0; drawCostNs = 0; drawMaxNs = 0 }
     }
 
     private fun text(c: Canvas, value: String, x: Float, y: Float, size: Float, color: Int,
@@ -313,9 +339,11 @@ internal class FusionDashboardView(context: Context) : View(context) {
         paint.strokeWidth = 1.5f; c.drawLine(x1, y1, x2, y2, paint)
     }
     private fun arrow(c: Canvas, x: Float, y: Float, color: Int) {
+        paint.style = Paint.Style.FILL_AND_STROKE; paint.strokeWidth = 2f
         paint.color = color; path.reset(); path.moveTo(x - 26, y); path.lineTo(x - 4, y - 20)
         path.lineTo(x - 4, y - 8); path.lineTo(x + 21, y - 8); path.lineTo(x + 21, y + 8)
         path.lineTo(x - 4, y + 8); path.lineTo(x - 4, y + 20); path.close(); c.drawPath(path, paint)
+        paint.style = Paint.Style.FILL
     }
     private val warningIndicators = setOf(DashboardIndicator.FAULT, DashboardIndicator.ABS, DashboardIndicator.TCS, DashboardIndicator.HDC, DashboardIndicator.RIDER_UNSEATED)
     private val secondRow = arrayOf(DashboardIndicator.FAULT, DashboardIndicator.ENERGY_RECOVERY,
@@ -389,7 +417,7 @@ internal class FusionDashboardView(context: Context) : View(context) {
     }
     private fun statusIcon(c: Canvas, id: DashboardIndicator, x: Float, y: Float) {
         val color = statusColor(id)
-        paint.color = color; paint.style = Paint.Style.STROKE; paint.strokeWidth = 3f
+        paint.color = color; paint.style = Paint.Style.STROKE; paint.strokeWidth = 4.5f
         paint.strokeCap = Paint.Cap.ROUND; paint.strokeJoin = Paint.Join.ROUND
         when (id) {
             DashboardIndicator.LEFT_TURN -> { paint.style = Paint.Style.FILL; arrow(c, x, y, color) }
@@ -405,23 +433,23 @@ internal class FusionDashboardView(context: Context) : View(context) {
                 rect.set(x - 23, y + 2, x + 23, y + 16); c.drawRoundRect(rect, 5f, 5f, paint)
                 c.drawLine(x - 14, y + 2, x - 9, y - 9, paint); c.drawLine(x - 9, y - 9, x + 9, y - 9, paint); c.drawLine(x + 9, y - 9, x + 14, y + 2, paint)
                 c.drawCircle(x - 13, y + 19, 3f, paint); c.drawCircle(x + 13, y + 19, 3f, paint)
-                text(c, "B", x, y - 12, 18f, color, medium, Paint.Align.CENTER)
+                text(c, "B", x, y - 12, 18f, color, bold, Paint.Align.CENTER)
             }
             DashboardIndicator.GPS -> {
                 c.drawCircle(x, y - 3, 12f, paint); c.drawCircle(x, y - 3, 3f, paint)
                 path.reset(); path.moveTo(x - 10, y + 5); path.lineTo(x, y + 21); path.lineTo(x + 10, y + 5); c.drawPath(path, paint)
             }
             DashboardIndicator.GSM -> { for (i in 0..3) c.drawLine(x - 15 + i * 10, y + 17, x - 15 + i * 10, y + 6 - i * 9, paint) }
-            DashboardIndicator.READY -> text(c, "READY", x, y + 7, 22f, color, medium, Paint.Align.CENTER)
+            DashboardIndicator.READY -> text(c, "READY", x, y + 7, 22f, color, bold, Paint.Align.CENTER)
             DashboardIndicator.ABS -> {
                 rect.set(x - 20, y - 18, x + 20, y + 18); c.drawOval(rect, paint)
                 rect.set(x - 28, y - 23, x + 28, y + 23)
                 c.drawArc(rect, 145f, 70f, false, paint); c.drawArc(rect, -35f, 70f, false, paint)
-                text(c, "ABS", x, y + 6, 17f, color, medium, Paint.Align.CENTER)
+                text(c, "ABS", x, y + 6, 17f, color, bold, Paint.Align.CENTER)
             }
             DashboardIndicator.TCS -> {
                 c.drawCircle(x, y, 23f, paint)
-                text(c, "TC", x, y + 8, 24f, color, medium, Paint.Align.CENTER)
+                text(c, "TC", x, y + 8, 24f, color, bold, Paint.Align.CENTER)
             }
             DashboardIndicator.HDC -> {
                 c.save(); c.rotate(20f, x, y); motorcycle(c, x, y - 4); c.drawLine(x - 25, y + 12, x + 25, y + 12, paint); c.restore()
@@ -453,10 +481,10 @@ internal class FusionDashboardView(context: Context) : View(context) {
                 motorcycle(c, x, y - 3); c.drawLine(x + 1, y + 1, x + 10, y + 23, paint); c.drawLine(x + 4, y + 23, x + 20, y + 23, paint)
             }
             DashboardIndicator.REPAIR_MODE -> {
-                paint.strokeWidth = 5f
+                paint.strokeWidth = 6f
                 c.drawLine(x - 15, y + 17, x + 6, y - 4, paint)
                 rect.set(x - 1, y - 23, x + 23, y + 1); c.drawArc(rect, 20f, 260f, false, paint)
-                c.drawCircle(x - 15, y + 17, 4f, paint); paint.strokeWidth = 3f
+                c.drawCircle(x - 15, y + 17, 4f, paint); paint.strokeWidth = 4.5f
             }
             DashboardIndicator.SEAT -> {
                 seat(c, x, y, true)
@@ -489,13 +517,13 @@ internal class FusionDashboardView(context: Context) : View(context) {
         }
     }
     private fun headlamp(c: Canvas, x: Float, y: Float, color: Int, dipped: Boolean = false) {
-        paint.color = color; paint.style = Paint.Style.STROKE; paint.strokeWidth = 3f
+        paint.color = color; paint.style = Paint.Style.STROKE; paint.strokeWidth = 4.5f
         rect.set(x, y - 16, x + 32, y + 16); c.drawRoundRect(rect, 14f, 14f, paint)
         for (i in -2..2) c.drawLine(x - 22, y + i * 7f + if (dipped) 8f else 0f, x - 6, y + i * 7f, paint)
         paint.style = Paint.Style.FILL
     }
     private fun bluetooth(c: Canvas, x: Float, y: Float, color: Int) {
-        paint.color = color; paint.style = Paint.Style.STROKE; paint.strokeWidth = 3f
+        paint.color = color; paint.style = Paint.Style.STROKE; paint.strokeWidth = 4.5f
         path.reset(); path.moveTo(x, y - 20); path.lineTo(x + 14, y - 9); path.lineTo(x - 13, y + 13)
         path.moveTo(x - 13, y - 13); path.lineTo(x + 14, y + 9); path.lineTo(x, y + 20); path.lineTo(x, y - 20)
         c.drawPath(path, paint); paint.style = Paint.Style.FILL
