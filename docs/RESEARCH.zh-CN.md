@@ -114,3 +114,7 @@ CarPlay Ultra 的原生车速/转速仪表需要专门的车辆集成，当前�
 资料：[Windows Media Foundation](https://learn.microsoft.com/en-us/windows/win32/medfound/media-foundation-programming-guide)、[Apple VideoToolbox](https://developer.apple.com/documentation/videotoolbox)、[ESP32-S3 数据手册](https://www.espressif.com/sites/default/files/documentation/esp32-s3_datasheet_en.pdf)、[ESP32-P4 H.264 编码](https://docs.espressif.com/projects/esp-vision/en/latest/esp32p4/api-reference/h264.html)。
 
 这些是移植方案分析，目前尚未完成 Windows、macOS 或 ESP32 接收端。
+
+## ESP32 车辆 BLE 接入（2026-10-15）
+
+已增加手动绑定车辆、后台 BLE 服务、50 ms 仪表刷新、新旧功率字段兼容和断连回演示。电压/电流按 0.1 V / 0.1 A 传输，优先在手机计算功率。来源精度、有效性和测试范围见 [车辆 BLE 接入说明](VEHICLE_BLE_INTEGRATION.zh-CN.md)。私有图标未复制进公开项目。

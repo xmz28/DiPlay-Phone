@@ -2,6 +2,7 @@
 // UI copy and visual language adapted from DiAuto. See docs/THIRD_PARTY_NOTICES.md.
 package com.shilapi.xcertplay
 
+import com.shilapi.xcertplay.vehicle.*
 import android.Manifest
 import android.app.AlertDialog
 import android.bluetooth.BluetoothManager
@@ -143,6 +144,21 @@ class DiPlayActivity : ComponentActivity() {
     private val tick = object : Runnable {
         override fun run() { refreshStatus(); handler.postDelayed(this, 1000) }
     }
+    private val vehicleBlePermission = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        if (VehicleBleSettings.hasPermissions(this)) chooseVehicleBle()
+        else { toast("请允许附近设备权限后再连接车辆"); render() }
+    }
+    private fun chooseVehicleBle() {
+        if (!VehicleBleSettings.hasPermissions(this)) {
+            vehicleBlePermission.launch(VehicleBleSettings.permissions())
+            return
+        }
+        VehicleBlePicker.show(this) { address ->
+            Esp32VehicleBleClient.getInstance(this).bindDevice(address)
+            VehicleBleSettings.setEnabled(this, true)
+            render()
+        }
+    }
     private val bluetoothPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) choosePhone() else permissionHelp(getString(R.string.nearby_devices), getString(R.string.allow_nearby_devices_so_diplay_can_connect_to_your_paired))
     }
@@ -192,6 +208,7 @@ class DiPlayActivity : ComponentActivity() {
         bydVehicleAdvancedExpanded = savedInstanceState?.getBoolean("byd_vehicle_advanced") ?: false
         advancedSettingsExpanded = savedInstanceState?.getBoolean("advanced_settings") ?: false
         page = savedInstanceState?.getString("page") ?: intent.getStringExtra("page") ?: "home"
+        VehicleBleSettings.resume(this)
         render()
         scheduleAutomaticVehicleValidation()
         handleWirelessRecovery()
@@ -528,7 +545,18 @@ class DiPlayActivity : ComponentActivity() {
                 if (it == 0) "0 秒 · 立即切换" else "${it / 1000.0} 秒"
             }.apply { onSave = { FusionThemeSettings.saveDuration(this@DiPlayActivity, it) } })
             card.addView(label("默认 1 秒，可拖动或用方向键调节。控制本地仪表配色，地图动画由 iPhone 决定。", 14, MUTED))
-            card.addView(label("2:1 按完整手机屏幕居中，适合镜像到 960×480 仪表。电压、电流仍为演示数据。", 14, MUTED))
+            card.addView(label("2:1 按完整手机屏幕居中，适合镜像到 960×480 仪表。未连接车辆 BLE 时使用演示数据。", 14, MUTED))
+        }
+        section(content, "车辆数据 · ESP32 BLE", R.drawable.ic_dp_connection) { card ->
+            toggle(card, "连接车辆数据", "断连或 3 秒无数据时恢复演示；只连接已选定车辆。", VehicleBleSettings.enabled(this)) { enabled ->
+                if (enabled && (!VehicleBleSettings.hasPermissions(this) || !Esp32VehicleBleClient.hasSavedDevice(this))) chooseVehicleBle()
+                else { VehicleBleSettings.setEnabled(this, enabled); render() }
+            }
+            card.addView(button("选择车辆 ESP32", false) { chooseVehicleBle() }, matchButton(10, 56))
+            val state = Esp32VehicleBleClient.getInstance(this).snapshot()
+            val status = if (state.connectionStatus == ConnectionStatus.CONNECTED) "已收到车辆数据" else "演示状态 · 未收到车辆数据"
+            card.addView(label("$status\n已绑定：${VehicleBleSettings.address(this) ?: "未选择"}", 14, MUTED))
+            card.addView(label("20 Hz 刷新；新固件提供 0.1 V / 0.1 A，功率优先在手机计算。旧固件仍可显示原功率。", 14, MUTED))
         }
         section(content, getString(R.string.carplay_controls), R.drawable.ic_dp_display) { card ->
             val gestureFingers = listOf(2, 3, 4)

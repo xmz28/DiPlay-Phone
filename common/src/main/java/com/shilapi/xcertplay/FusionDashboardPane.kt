@@ -12,6 +12,8 @@ import android.view.TextureView
 import android.widget.Button
 import android.widget.FrameLayout
 import com.shilapi.xcertplay.glance.CarPlayGlance
+import com.shilapi.xcertplay.vehicle.Esp32VehicleBleClient
+import com.shilapi.xcertplay.vehicle.VehicleBleSettings
 
 /** Remains mounted alongside the primary texture; changing page does not replace its decoder. */
 internal class FusionDashboardPane(context: Context, private val main: () -> Unit,
@@ -34,7 +36,9 @@ internal class FusionDashboardPane(context: Context, private val main: () -> Uni
         mapThemeButton.tooltipText = mapThemeButton.contentDescription
     }
     private fun refreshForeground() {
-        foreground.setIndicators(indicatorSource.snapshot())
+        val data = vehicleDashboardSnapshot(Esp32VehicleBleClient.getInstance(context).snapshot(), VehicleBleSettings.enabled(context))
+        foreground.setVehicle(data.vehicle)
+        foreground.setIndicators(if (data.indicators.demonstration) indicatorSource.snapshot() else data.indicators)
         foreground.setMedia(CarPlayMediaKeys.dashboardSnapshot())
         foreground.update(CarPlayGlance.snapshot(), MapMirrors.streamActive)
     }
@@ -52,7 +56,7 @@ internal class FusionDashboardPane(context: Context, private val main: () -> Uni
     private val swipe = DisplayPageSwipe(resources.displayMetrics.density) { main() }
     private val aspectChanged: () -> Unit = { layoutChildren() }
     private val tick = object : Runnable {
-        override fun run() { refreshForeground(); handler.postDelayed(this, 350) }
+        override fun run() { refreshForeground(); handler.postDelayed(this, 50) }
     }
     private val carplay = Button(context).apply {
         text = ""; contentDescription = "CarPlay 主屏与音乐"; setBackgroundColor(Color.TRANSPARENT)

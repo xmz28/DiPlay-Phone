@@ -15,10 +15,11 @@ import java.util.Locale
 
 /** Local foreground only: the live map remains a separate hardware decoded texture. */
 internal class FusionDashboardView(context: Context) : View(context) {
-    data class VehiclePreview(val speed: Int = 48, val gear: String = "D", val power: String = "2.6",
-        val battery: Int = 78, val voltage: String = "72.8", val current: String = "35.7", val range: Int = 62, val odometer: String = "1,186")
+    data class VehiclePreview(val speed: Int? = 48, val gear: String = "D", val power: String = "2.6",
+        val battery: Int? = 78, val voltage: String = "72.8", val current: String = "35.7", val range: Int? = 62, val odometer: String = "1,186")
 
-    private val vehicle = VehiclePreview()
+    private var vehicle = VehiclePreview()
+    fun setVehicle(value: VehiclePreview) { vehicle = value }
     private var indicators = DemoDashboardIndicators.snapshot()
     private var night = true
     private var mapNight = true
@@ -63,6 +64,7 @@ internal class FusionDashboardView(context: Context) : View(context) {
     fun setMedia(value: CarPlayMediaKeys.DashboardMedia) { media = value }
     private var blink = false
     private var clock = ""
+    private var clockSecond = -1L
     private val formatter = SimpleDateFormat("HH:mm", Locale.getDefault())
     private var white = Color.rgb(244, 247, 255)
     private var muted = Color.rgb(167, 184, 210)
@@ -98,7 +100,8 @@ internal class FusionDashboardView(context: Context) : View(context) {
         glance = snapshot
         mapActive = active
         blink = (android.os.SystemClock.uptimeMillis() / 700) % 2 == 0L
-        clock = formatter.format(Date())
+        val second = System.currentTimeMillis() / 1000
+        if (second != clockSecond) { clockSecond = second; clock = formatter.format(Date()) }
         if (glyphType != snapshot.maneuverType) {
             glyphType = snapshot.maneuverType
             glyph = snapshot.maneuverType?.let { type ->
@@ -116,7 +119,7 @@ internal class FusionDashboardView(context: Context) : View(context) {
                 if (id == 0) null else ContextCompat.getDrawable(context, id)?.mutate()?.apply { setTint(white) }
             }
         }
-        contentDescription = "演示仪表，速度 ${vehicle.speed}，电量 ${vehicle.battery}%，续航 ${vehicle.range} 公里"
+        contentDescription = "${if (indicators.demonstration) "演示" else "车辆"}仪表，速度 ${vehicle.speed ?: "--"}，电量 ${vehicle.battery ?: "--"}%"
         invalidate()
     }
 
@@ -192,7 +195,7 @@ internal class FusionDashboardView(context: Context) : View(context) {
         rect.set(61f, 125f, 617f, 681f)
         canvas.drawArc(rect, 140f, 126f, false, paint)
         paint.strokeCap = Paint.Cap.BUTT; paint.style = Paint.Style.FILL
-        text(canvas, vehicle.speed.toString(), 339f, 409f, 224f, white, bold, Paint.Align.CENTER)
+        text(canvas, (vehicle.speed?.toString() ?: "--"), 339f, 409f, 224f, white, bold, Paint.Align.CENTER)
         text(canvas, "km/h", 339f, 461f, 42f, muted, regular, Paint.Align.CENTER)
         line(canvas, 155f, 502f, 523f, 502f)
         text(canvas, vehicle.gear, 339f, 577f, 68f, white, medium, Paint.Align.CENTER)
@@ -242,7 +245,7 @@ internal class FusionDashboardView(context: Context) : View(context) {
         }
         battery(canvas, 480f, 770f)
         text(canvas, "电量", 565f, 775f, 28f, muted)
-        text(canvas, "${vehicle.battery}%", 565f, 814f, 40f, white, medium)
+        text(canvas, "${vehicle.battery ?: "--"}%", 565f, 814f, 40f, white, medium)
         line(canvas, 680f, 755f, 680f, 818f)
         text(canvas, "电压", 711f, 775f, 28f, muted)
         text(canvas, "${vehicle.voltage} V", 711f, 814f, 36f, white, medium)
@@ -250,7 +253,7 @@ internal class FusionDashboardView(context: Context) : View(context) {
         text(canvas, "${vehicle.current} A", 864f, 814f, 36f, white, medium)
         line(canvas, 1020f, 755f, 1020f, 818f)
         text(canvas, "续航", 1052f, 775f, 28f, muted)
-        text(canvas, "${vehicle.range} km", 1052f, 814f, 40f, white, medium)
+        text(canvas, "${vehicle.range ?: "--"} km", 1052f, 814f, 40f, white, medium)
         line(canvas, 1225f, 755f, 1225f, 818f)
         text(canvas, "里程", 1260f, 775f, 28f, muted)
         text(canvas, "${vehicle.odometer} km", 1260f, 814f, 36f, white, medium)
