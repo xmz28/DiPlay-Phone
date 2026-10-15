@@ -1,5 +1,13 @@
 # Unreleased
 
+## 2026-10-15 — Fusion BLE Debug 2
+
+- Add optional ESP32 BLE vehicle telemetry with explicit device binding, timeout fallback and electrical freshness checks. Companion firmware: ESP32 Vehicle Dashboard v0.1.8.
+- Compute signed power from valid voltage/current, keep older power fallback, and drive the blue/green power arc.
+- Add independent day-to-night and night-to-day dashboard transition settings.
+- Publish Android debug version 0.2.11-fusion-ble-debug.2 (31), retaining the package and local debug signing key.
+
+
 - Save diagnostic reports privately in DiPlay when the head unit has no document picker or working Downloads provider, with explicit Share and selectable View report actions. This unblocks collecting logs for #135; its CarPlay startup failure still needs a device report.
 
 # DiPlay 0.2.11 — 2026-10-03

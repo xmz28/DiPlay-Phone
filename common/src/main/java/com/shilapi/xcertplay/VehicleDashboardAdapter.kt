@@ -56,7 +56,7 @@ internal fun vehicleDashboardSnapshot(state: VehicleState, enabled: Boolean): Ve
     put(DashboardIndicator.CHARGING, i.charge)
     return VehicleDashboardSnapshot(
         FusionDashboardView.VehiclePreview(
-            speed = v.speedKmh.takeIf { v.speedValid }, gear = gear, power = power,
+            speed = v.speedKmh.takeIf { v.speedValid }, gear = gear, power = power, powerKw = v.displayPowerKw,
             battery = v.batteryPercent.takeIf { v.batteryValid },
             voltage = decimal(v.voltageV, v.voltageValid), current = decimal(v.currentA, v.currentValid),
             // No range estimate is supplied by this protocol. Odometer is ESP32's speed integration.

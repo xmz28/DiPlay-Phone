@@ -58,7 +58,7 @@ jobs:
           from pathlib import Path
           from zipfile import ZipFile
           badging = (Path(os.environ['RUNNER_TEMP']) / 'phone-test-badging.txt').read_text()
-          assert "package: name='com.shihab.diplay.hudtest' versionCode='30' versionName='0.2.11-orientation-lock-hud-test'" in badging
+          assert "package: name='com.shihab.diplay.hudtest' versionCode='31' versionName='0.2.11-fusion-ble-debug.2'" in badging
           print(badging.splitlines()[0])
           apk_path = Path('mobile/build/outputs/apk/debug/mobile-debug.apk')
           runtime = Path(os.environ['RUNNER_TEMP']) / 'diplay-test-runtime' / 'offline-mfi'
@@ -68,10 +68,10 @@ jobs:
               assert any(name.startswith('lib/arm64-v8a/') and name.endswith('.so') for name in apk.namelist())
           output = Path('mobile/build/outputs/standalone-test')
           output.mkdir(parents=True, exist_ok=True)
-          target = output / 'DiPlay-0.2.11-orientation-lock-test.apk'
+          target = output / 'DiPlay-fusion-ble-debug.apk'
           target.write_bytes(apk_path.read_bytes())
           (output / 'SHA256SUMS.txt').write_text(hashlib.sha256(target.read_bytes()).hexdigest() + '  ' + target.name + '\n')
-          (output / 'SOURCE.txt').write_text('Source commit: ' + os.environ['GITHUB_SHA'] + '\nPackage: com.shihab.diplay.hudtest\nVersion: 0.2.11-orientation-lock-hud-test (30)\nUpstream main snapshot: e6e7cc0eaf175ef397eee7ac6223eb267cdc68bd\nUpstream release commit: 6014025c653c4dae88d319ce446e0bf1ddb658ea\nRuntime identity: published DiPlay 0.2.11\n')
+          (output / 'SOURCE.txt').write_text('Source commit: ' + os.environ['GITHUB_SHA'] + '\nPackage: com.shihab.diplay.hudtest\nVersion: 0.2.11-fusion-ble-debug.2 (31)\nUpstream main snapshot: e6e7cc0eaf175ef397eee7ac6223eb267cdc68bd\nUpstream release commit: 6014025c653c4dae88d319ce446e0bf1ddb658ea\nRuntime identity: published DiPlay 0.2.11\n')
           print('Verified runtime identity assets and arm64 libraries in standalone APK')
           PY
       - name: Upload standalone test APK

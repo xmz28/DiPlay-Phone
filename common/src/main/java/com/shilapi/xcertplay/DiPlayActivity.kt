@@ -541,10 +541,13 @@ class DiPlayActivity : ComponentActivity() {
                 FusionDisplayPreset.load(this).ordinal, reconnects = false) {
                 FusionDisplayPreset.save(this, FusionDisplayPreset.entries[it])
             }
-            card.addView(overlaySliderRow("仪表日夜过渡时长", (0..30).map { it * 100 }, FusionThemeSettings.duration(this)) {
-                if (it == 0) "0 秒 · 立即切换" else "${it / 1000.0} 秒"
-            }.apply { onSave = { FusionThemeSettings.saveDuration(this@DiPlayActivity, it) } })
-            card.addView(label("默认 1 秒，可拖动或用方向键调节。控制本地仪表配色，地图动画由 iPhone 决定。", 14, MUTED))
+            for (toNight in listOf(false, true)) {
+                val title = if (toNight) "日间 → 夜间过渡时长" else "夜间 → 日间过渡时长"
+                card.addView(overlaySliderRow(title, (0..30).map { it * 100 }, FusionThemeSettings.duration(this, toNight)) {
+                    if (it == 0) "0 秒 · 立即切换" else "${it / 1000.0} 秒"
+                }.apply { onSave = { FusionThemeSettings.saveDuration(this@DiPlayActivity, toNight, it) } })
+            }
+            card.addView(label("夜→日默认 1.2 秒，日→夜默认 1.6 秒；分别在 0～3 秒间调节。本地仪表跟随对应时长，地图动画由 iPhone 决定。", 14, MUTED))
             card.addView(label("2:1 按完整手机屏幕居中，适合镜像到 960×480 仪表。未连接车辆 BLE 时使用演示数据。", 14, MUTED))
         }
         section(content, "车辆数据 · ESP32 BLE", R.drawable.ic_dp_connection) { card ->

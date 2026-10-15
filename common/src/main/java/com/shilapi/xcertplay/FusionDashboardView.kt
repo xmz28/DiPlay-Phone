@@ -16,7 +16,7 @@ import java.util.Locale
 /** Local foreground only: the live map remains a separate hardware decoded texture. */
 internal class FusionDashboardView(context: Context) : View(context) {
     data class VehiclePreview(val speed: Int? = 48, val gear: String = "D", val power: String = "2.6",
-        val battery: Int? = 78, val voltage: String = "72.8", val current: String = "35.7", val range: Int? = 62, val odometer: String = "1,186")
+        val battery: Int? = 78, val voltage: String = "72.8", val current: String = "35.7", val range: Int? = 62, val odometer: String = "1,186", val powerKw: Double? = 2.6)
 
     private var vehicle = VehiclePreview()
     fun setVehicle(value: VehiclePreview) { vehicle = value }
@@ -34,9 +34,10 @@ internal class FusionDashboardView(context: Context) : View(context) {
         night = value
         themeAnimator?.cancel()
         val target = if (value) 1f else 0f
-        if (!animate || FusionThemeSettings.duration(context) == 0) { themeFraction = target; applyPalette(); return }
+        val transitionDuration = FusionThemeSettings.duration(context, toNight = value)
+        if (!animate || transitionDuration == 0) { themeFraction = target; applyPalette(); return }
         themeAnimator = ValueAnimator.ofFloat(themeFraction, target).apply {
-            duration = FusionThemeSettings.duration(context).toLong()
+            duration = transitionDuration.toLong()
             interpolator = AccelerateDecelerateInterpolator()
             addUpdateListener { themeFraction = it.animatedValue as Float; applyPalette() }
             start()
@@ -85,6 +86,8 @@ internal class FusionDashboardView(context: Context) : View(context) {
     private var footerFill: Shader? = null
     private val speedArcShader = LinearGradient(76f, 666f, 602f, 140f,
         Color.rgb(8, 137, 242), Color.rgb(42, 179, 255), Shader.TileMode.CLAMP)
+    private val recoveryArcShader = LinearGradient(76f, 666f, 602f, 140f,
+        Color.rgb(0, 172, 94), Color.rgb(28, 233, 100), Shader.TileMode.CLAMP)
     private var logicalHeight = 864f
     private var edgeFade = LinearGradient(0f, 0f, 0f, 864f,
         intArrayOf(Color.argb(100, 3, 10, 17), Color.TRANSPARENT, Color.TRANSPARENT, Color.argb(230, 3, 10, 17)),
@@ -184,16 +187,19 @@ internal class FusionDashboardView(context: Context) : View(context) {
         paint.color = themed(Color.rgb(184, 201, 215), Color.rgb(17, 32, 44))
         rect.set(76f, 140f, 602f, 666f)
         canvas.drawArc(rect, 140f, 260f, false, paint)
-        paint.color = Color.WHITE; paint.shader = speedArcShader
-        canvas.drawArc(rect, 140f, 126f, false, paint)
+        val powerRing = dashboardPowerRing(vehicle.powerKw)
+        val powerSweep = 260f * powerRing.fraction
+        val accent = if (powerRing.recovery) Color.rgb(28, 233, 100) else Color.rgb(85, 197, 255)
+        paint.color = Color.WHITE; paint.shader = if (powerRing.recovery) recoveryArcShader else speedArcShader
+        canvas.drawArc(rect, 140f, powerSweep, false, paint)
         paint.shader = null
-        paint.strokeWidth = 1.5f; paint.color = Color.argb(95, 85, 197, 255)
+        paint.strokeWidth = 1.5f; paint.color = Color.argb(95, Color.red(accent), Color.green(accent), Color.blue(accent))
         rect.set(86f, 150f, 592f, 656f)
-        canvas.drawArc(rect, 140f, 126f, false, paint)
+        canvas.drawArc(rect, 140f, powerSweep, false, paint)
         paint.strokeWidth = 3f
-        paint.color = Color.argb(90, 45, 169, 255)
+        paint.color = Color.argb(90, Color.red(accent), Color.green(accent), Color.blue(accent))
         rect.set(61f, 125f, 617f, 681f)
-        canvas.drawArc(rect, 140f, 126f, false, paint)
+        canvas.drawArc(rect, 140f, powerSweep, false, paint)
         paint.strokeCap = Paint.Cap.BUTT; paint.style = Paint.Style.FILL
         text(canvas, (vehicle.speed?.toString() ?: "--"), 339f, 409f, 224f, white, bold, Paint.Align.CENTER)
         text(canvas, "km/h", 339f, 461f, 42f, muted, regular, Paint.Align.CENTER)

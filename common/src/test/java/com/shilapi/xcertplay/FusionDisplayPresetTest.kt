@@ -55,12 +55,12 @@ class FusionDisplayPresetTest {
         view.setNightMode(false, false)
         view.setMapNightMode(true)
         assertEquals(0f, view.themeFraction)
-        FusionThemeSettings.saveDuration(context, 0)
+        FusionThemeSettings.saveDuration(context, true, 0)
         view.setNightMode(true, true)
         assertEquals(1f, view.themeFraction)
         FusionThemeSettings.select(context, false, false)
         org.junit.Assert.assertFalse(FusionThemeSettings.mapIndependent(context))
         org.junit.Assert.assertFalse(FusionThemeSettings.hudNight(context, true))
-        FusionThemeSettings.saveDuration(context, 1000)
+        FusionThemeSettings.saveDuration(context, true, 1600)
     }
 }
