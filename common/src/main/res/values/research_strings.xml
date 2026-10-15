@@ -1,0 +1,4 @@
+<resources>
+    <string name="native_home_title">CarPlay instrument icon</string>
+    <string name="native_home_hint">Show the instrument entry in CarPlay. Open the dashboard while keeping the connection. The name is customizable.</string>
+</resources>

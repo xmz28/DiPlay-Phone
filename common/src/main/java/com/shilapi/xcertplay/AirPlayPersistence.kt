@@ -426,9 +426,22 @@ object AirPlayPersistence {
 
     fun loadOemLabel(context: Context): String =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getString(KEY_OEM_LABEL, DEFAULT_OEM_LABEL)
+            .getString(KEY_OEM_LABEL, defaultOemLabel())
             // iOS hides the car icon without a label.
-            .orEmpty().ifBlank { DEFAULT_OEM_LABEL }
+            .orEmpty().ifBlank { defaultOemLabel() }
+
+    private fun isBydDevice(): Boolean =
+        Build.MANUFACTURER.startsWith("BYD", true) || Build.BRAND.startsWith("BYD", true) ||
+        Build.FINGERPRINT.startsWith("BYD-AUTO/", true)
+    private fun defaultOemLabel(): String = if (isBydDevice()) DEFAULT_OEM_LABEL else "仪表"
+
+    fun loadNativeHomeEnabled(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("native_home_enabled", true)
+
+    fun saveNativeHomeEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean("native_home_enabled", enabled).apply()
+    }
 
     fun saveOemLabel(context: Context, oemLabel: String) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
@@ -524,7 +537,7 @@ object AirPlayPersistence {
     }
 
     fun loadClusterMapEnabled(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_CLUSTER_MAP, false)
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_CLUSTER_MAP, !isBydDevice())
 
     fun saveClusterMapEnabled(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_CLUSTER_MAP, enabled).apply()

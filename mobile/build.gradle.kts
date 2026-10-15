@@ -5,7 +5,7 @@ plugins {
 
 // Optional local-only input. CI and ordinary source builds contain no accessory identity.
 val localAuthenticationAssets = providers.environmentVariable("DIPLAY_AUTH_ASSETS_DIR")
-    .orNull?.let { file(it).canonicalFile }
+    .orNull?.takeIf { it.isNotBlank() }?.let { file(it).canonicalFile }
 
 android {
     namespace = "com.shilapi.xcertplay"
@@ -17,7 +17,7 @@ android {
         applicationId = "com.shihab.diplay"
         minSdk = 28
         targetSdk = 37
-        versionCode = 30
+        versionCode = 32
         versionName = "0.2.11"
 
     }
@@ -40,7 +40,7 @@ android {
     buildTypes {
         debug {
             applicationIdSuffix = ".hudtest"
-            versionNameSuffix = "-orientation-lock-hud-test"
+            versionNameSuffix = "-fusion-ble-debug.3"
         }
         release {
             optimization {

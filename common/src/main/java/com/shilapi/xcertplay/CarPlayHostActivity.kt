@@ -282,6 +282,62 @@ class CarPlayHostActivity : ComponentActivity() {
     private var sink: AndroidMediaSink? = null
     private var controller: CarPlayController? = null
     private var currentSurface: Surface? = null
+    private var fusionPane: FusionDashboardPane? = null
+    private var fusionRoot: FrameLayout? = null
+
+    private fun applyFusionOrientation() {
+        if (FusionDisplayPreset.load(this) != FusionDisplayPreset.CLUSTER_2_1) return
+        if (requestedOrientation == android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE) return
+        val metrics = android.util.DisplayMetrics()
+        @Suppress("DEPRECATION")
+        windowManager.defaultDisplay.getRealMetrics(metrics)
+        lockedCarPlayRotation = if (metrics.widthPixels < metrics.heightPixels) Surface.ROTATION_90 else displayRotation()
+        lockedCarPlayOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        requestedOrientation = lockedCarPlayOrientation!!
+    }
+
+    private fun applyFusionPreset() {
+        val root = fusionRoot ?: return
+        val pane = fusionPane ?: return
+        if (root.width == 0 || root.height == 0) return
+        val metrics = android.util.DisplayMetrics()
+        @Suppress("DEPRECATION")
+        windowManager.defaultDisplay.getRealMetrics(metrics)
+        val origin = IntArray(2); root.getLocationOnScreen(origin)
+        val area = fusionDisplayRect(root.width, root.height, metrics.widthPixels, metrics.heightPixels,
+            origin[0], origin[1], FusionDisplayPreset.load(this))
+        val old = pane.layoutParams as FrameLayout.LayoutParams
+        if (old.width == area.width() && old.height == area.height() && old.leftMargin == area.left && old.topMargin == area.top) return
+        pane.layoutParams = FrameLayout.LayoutParams(area.width(), area.height()).apply { leftMargin = area.left; topMargin = area.top }
+    }
+    private var fusionSelected = false
+    private var pageAnimating = false
+    private var waitingForFusion = false
+    private val pageSwipe by lazy { DisplayPageSwipe(resources.displayMetrics.density) { showDisplayPage(it) } }
+    private val fusionWaitTimeout = Runnable { if (waitingForFusion) { waitingForFusion = false; showDisplayPage(true, waitForFrame = false) } }
+
+    private fun showDisplayPage(fusion: Boolean, waitForFrame: Boolean = true) {
+        val pane = fusionPane ?: return
+        applyFusionPreset()
+        if (pageAnimating || fusion == fusionSelected) return
+        controller?.sendTouch(emptyList())
+        if (fusion && waitForFrame && MapMirrors.streamActive && !pane.ready) {
+            waitingForFusion = true
+            mainHandler.removeCallbacks(fusionWaitTimeout)
+            mainHandler.postDelayed(fusionWaitTimeout, 1000)
+            return
+        }
+        waitingForFusion = false; mainHandler.removeCallbacks(fusionWaitTimeout)
+        fusionSelected = fusion; pageAnimating = true
+        connectionPanel?.visibility = if (!fusion && activeScreenStreamTypes.isEmpty()) View.VISIBLE else View.GONE
+        pane.pageActive = fusion
+        pane.translationX = if (fusion) -pane.width * .12f else 0f
+        pane.animate().translationX(if (fusion) 0f else -pane.width * .12f)
+            .alpha(if (fusion) 1f else .001f).setDuration(240).withEndAction { pageAnimating = false }.start()
+        videoView?.animate()?.translationX(if (fusion) pane.width * .12f else 0f)
+            ?.alpha(if (fusion) .001f else 1f)?.setDuration(240)?.start()
+        Log.i(TAG, "display page=${if (fusion) "fusion" else "main"}; session and surfaces retained")
+    }
     private var currentSurfaceTexture: SurfaceTexture? = null
     private var clusterPresentation: ClusterMapPresentation? = null
     private var clusterSurface: Surface? = null
@@ -373,6 +429,11 @@ class CarPlayHostActivity : ComponentActivity() {
             initialNight = darkMode,
         ) { night ->
             darkMode = night
+            fusionPane?.setMapNightMode(night)
+            if (!FusionThemeSettings.mapIndependent(this)) {
+                FusionThemeSettings.select(this, night, false)
+                fusionPane?.setNightMode(night)
+            }
             applyClusterTurnOverlay()
             appendLog("CarPlay switched to ${if (night) "night" else "day"} mode")
             logThemeState(nightModeDiagnosticSource, resources.configuration)
@@ -467,6 +528,7 @@ class CarPlayHostActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        savedInstanceState?.getString("display_page")?.let { intent.putExtra("display_page", it) }
         restoreCarPlayOrientation(savedInstanceState)
         NavigationWidgetUpdater.attach(applicationContext)
         CenterMapOverlay.requestShow = ::showCenterMap
@@ -664,6 +726,7 @@ class CarPlayHostActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        intent.getStringExtra("display_page")?.let { showDisplayPage(it == "fusion") }
         if (isIphoneUsbAttachment(intent) && wirelessEnabled) {
             shutdown(false, "switching to USB") {
                 AirPlayPersistence.saveWirelessEnabled(this, false)
@@ -692,7 +755,9 @@ class CarPlayHostActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        fusionRoot?.post { applyFusionPreset() }
         displayResizePaused = false
+        applyFusionOrientation()
         lockedCarPlayOrientation?.let { requestedOrientation = it }
         val savedNightMode = AirPlayPersistence.loadCarPlayNightMode(this)
         val savedThreshold = AirPlayPersistence.loadAmbientLightThreshold(this)
@@ -962,6 +1027,7 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
+        outState.putString("display_page", if (fusionSelected) "fusion" else "main")
         outState.putBoolean("carplay_night_active", darkMode)
         lockedCarPlayOrientation?.let { outState.putInt(STATE_CARPLAY_ORIENTATION, it) }
         lockedCarPlayRotation?.let { outState.putInt(STATE_CARPLAY_ROTATION, it) }
@@ -1061,6 +1127,8 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        mainHandler.removeCallbacks(fusionWaitTimeout)
+        fusionPane?.animate()?.cancel()
         nightModeController.pause()
         pictureBinding?.close()
         pictureBinding = null
@@ -1107,6 +1175,19 @@ class CarPlayHostActivity : ComponentActivity() {
         }
         root.addView(video, FrameLayout.LayoutParams(-1, -1))
         root.addView(gestureLayer, FrameLayout.LayoutParams(-1, -1))
+        val fusion = FusionDashboardPane(this, { showDisplayPage(false) }, { showDiPlayHome() }, {
+            if (waitingForFusion) showDisplayPage(true, waitForFrame = false)
+        }, { toggleFusionTheme() }, { toggleFusionMapTheme() }).apply {
+            alpha = .001f; setNightMode(FusionThemeSettings.hudNight(this@CarPlayHostActivity, darkMode)); setMapNightMode(darkMode)
+        }
+        fusionPane = fusion
+        root.addView(fusion, FrameLayout.LayoutParams(-1, -1))
+        fusionRoot = root
+        root.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> applyFusionPreset() }
+        ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
+            view.post { applyFusionPreset() }
+            insets
+        }
         // Measure the preparation content naturally, then fit it inside the safe viewport.
         val viewport = object : FrameLayout(this) {
             override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -1233,6 +1314,7 @@ class CarPlayHostActivity : ComponentActivity() {
         settingsGestureHint = gestureHint
         stageStatusView = stage
         connectionPanel = viewport
+        root.post { if (intent.getStringExtra("display_page") == "fusion") showDisplayPage(true) }
         updateDebugOverlays()
         return root
     }
@@ -3207,7 +3289,7 @@ class CarPlayHostActivity : ComponentActivity() {
             manufacturer = normalizedManufacturer(),
             model = normalizedModel(),
             oemLabel = oemLabel,
-            icons = if (hasBydCarUi()) listOf(loadAirPlayIcon()) else emptyList(),
+            icons = if (AirPlayPersistence.loadNativeHomeEnabled(this)) listOf(loadAirPlayIcon()) else emptyList(),
             videoInCar = com.shilapi.xcertplay.hud.BydOutputSettings.videoWhileParkedActive(this),
         )
     }
@@ -3243,9 +3325,26 @@ class CarPlayHostActivity : ComponentActivity() {
         return AirPlayIcon(bounds.outWidth, bounds.outHeight, encoded)
     }
 
-    private fun defaultAirPlayIconBytes(): ByteArray =
-        // Shown in CarPlay's app list as the "back to the car" button.
-        resources.openRawResource(R.raw.ic_car_home).use { it.readBytes() }
+    private fun defaultAirPlayIconBytes(): ByteArray {
+        if (hasBydCarUi()) return resources.openRawResource(R.raw.ic_car_home).use { it.readBytes() }
+        val bitmap = Bitmap.createBitmap(192, 192, Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(bitmap)
+        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+        paint.color = Color.rgb(35, 112, 225)
+        canvas.drawRoundRect(0f, 0f, 192f, 192f, 38f, 38f, paint)
+        paint.color = Color.WHITE
+        paint.style = android.graphics.Paint.Style.STROKE; paint.strokeWidth = 10f
+        paint.strokeCap = android.graphics.Paint.Cap.ROUND
+        canvas.drawArc(android.graphics.RectF(36f, 42f, 156f, 162f), 145f, 250f, false, paint)
+        canvas.drawLine(96f, 105f, 128f, 68f, paint)
+        paint.style = android.graphics.Paint.Style.FILL
+        canvas.drawCircle(96f, 105f, 11f, paint)
+        return java.io.ByteArrayOutputStream().use { output ->
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)
+            bitmap.recycle()
+            output.toByteArray()
+        }
+    }
 
     private fun updateAirPlayIconPreview() {
         val preview = iconPreviewView ?: return
@@ -3796,7 +3895,7 @@ class CarPlayHostActivity : ComponentActivity() {
     private fun displayRotation(): Int = videoView?.display?.rotation ?: windowManager.defaultDisplay.rotation
 
     private fun canApplyDisplaySize(): Boolean = !displayResizePaused &&
-        (lockedCarPlayRotation == null || lockedCarPlayRotation == displayRotation())
+        CarPlayOrientation.rotationCompatible(lockedCarPlayRotation, displayRotation(), lockedCarPlayOrientation)
 
     private fun restoreCarPlayOrientation(savedInstanceState: Bundle?) {
         val retained = CarPlayBackgroundSession.snapshot()?.display
@@ -3806,12 +3905,14 @@ class CarPlayHostActivity : ComponentActivity() {
         lockedCarPlayOrientation = if (savedInstanceState?.containsKey(STATE_CARPLAY_ORIENTATION) == true) {
             savedInstanceState.getInt(STATE_CARPLAY_ORIENTATION)
         } else retained?.lockedOrientation ?: CarPlayOrientation.capture(this, lockedCarPlayRotation!!)
+        lockedCarPlayOrientation = CarPlayOrientation.allowLandscapeFlip(lockedCarPlayOrientation!!)
         requestedOrientation = lockedCarPlayOrientation!!
+        applyFusionOrientation()
     }
 
     private fun displayLayoutChanged(newSize: DisplaySize? = activeDisplaySize): Boolean {
         val display = sessionDisplay ?: return false
-        if (display.rotation != displayRotation()) return true
+        if (!CarPlayOrientation.rotationCompatible(display.rotation, displayRotation(), lockedCarPlayOrientation)) return true
         if (display.hideTopBar != hideTopBar || display.hideBottomBar != hideBottomBar) return true
         if (newSize != null && newSize.width > 0 && newSize.height > 0) {
             val baseAspect = display.width.toDouble() / display.height
@@ -3955,6 +4056,27 @@ class CarPlayHostActivity : ComponentActivity() {
         controller?.sendTouch(emptyList())
         startActivity(Intent(this, DiPlayActivity::class.java)
             .putExtra("page", page).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
+    }
+
+    private fun toggleFusionTheme() {
+        val target = !FusionThemeSettings.hudNight(this, darkMode)
+        FusionThemeSettings.select(this, target, false)
+        configureFusionMapNight(target)
+        fusionPane?.setNightMode(target)
+        fusionPane?.setMapNightMode(target)
+    }
+
+    private fun toggleFusionMapTheme() {
+        FusionThemeSettings.select(this, FusionThemeSettings.hudNight(this, darkMode), true)
+        configureFusionMapNight(!darkMode)
+        fusionPane?.setMapNightMode(darkMode)
+    }
+
+    private fun configureFusionMapNight(target: Boolean) {
+        carPlayNightMode = if (target) CarPlayNightMode.NIGHT else CarPlayNightMode.DAY
+        AirPlayPersistence.saveCarPlayNightMode(this, carPlayNightMode)
+        nightModeController.configure(carPlayNightMode, nightModeOrNull(resources.configuration.uiMode) ?: false,
+            ambientLightThreshold, ambientDelaySeconds)
     }
 
     private fun openSettingsMenu() = showDiPlayHome("settings")
@@ -4104,7 +4226,8 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun onHostTouch(view: View, event: MotionEvent): Boolean {
-        if (menuOpen) return true
+        if (pageAnimating || menuOpen) return true
+        if (pageSwipe.handle(event, false)) return true
 
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
@@ -4113,14 +4236,28 @@ class CarPlayHostActivity : ComponentActivity() {
             }
             MotionEvent.ACTION_POINTER_DOWN -> {
                 if (event.pointerCount == gestureFingerCount && !gestureSequenceActive) {
-                    gestureSequenceActive = true
                     gestureTracking = true
                     gestureStartX = pointerCentroid(event, horizontal = true)
                     gestureStartY = pointerCentroid(event, horizontal = false)
-                    controller?.sendTouch(emptyList())
-                    appendLog("Settings swipe tracking started; fingers=$gestureFingerCount")
-                    return true
+                    if (gestureFingerCount != 2) {
+                        gestureSequenceActive = true
+                        controller?.sendTouch(emptyList())
+                        appendLog("Settings swipe tracking started; fingers=$gestureFingerCount")
+                        return true
+                    }
                 }
+            }
+        }
+
+        // With two fingers, wait for a vertical commitment; do not steal a pinch at pointer-down.
+        if (gestureFingerCount == 2 && gestureTracking && event.pointerCount == 2 && event.actionMasked == MotionEvent.ACTION_MOVE) {
+            val dx = Math.abs(pointerCentroid(event, horizontal = true) - gestureStartX)
+            val dy = pointerCentroid(event, horizontal = false) - gestureStartY
+            if (dy >= dp(SETTINGS_SWIPE_DISTANCE_DP) && dy >= dx * SETTINGS_SWIPE_DIRECTION_RATIO) {
+                gestureTracking = false
+                controller?.sendTouch(emptyList())
+                openSettingsMenu()
+                return true
             }
         }
 
@@ -4229,7 +4366,7 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun updateDebugOverlays() {
         statusScrollView?.visibility = View.GONE
-        connectionPanel?.visibility = if (activeScreenStreamTypes.isEmpty()) View.VISIBLE else View.GONE
+        connectionPanel?.visibility = if (!fusionSelected && activeScreenStreamTypes.isEmpty()) View.VISIBLE else View.GONE
     }
 
     private fun friendlyStage(message: String): String = when {

@@ -1,84 +1,86 @@
-# DiPlay 手机适配版
+# DiPlay 手机融合仪表版
 
-将 Android 手机用作 CarPlay 接收端。这个分支基于 [DiPlay](https://github.com/shihabal3amri/DiPlay)，针对手机屏幕、横屏布局、设置入口和屏幕方向进行适配。
+将 Android 手机用作 CarPlay 接收端，在完整 CarPlay 主屏之外增加融合仪表：右侧显示真实 CarPlay 副屏地图，左侧显示仪表，底栏显示真实音乐封面、歌曲和播放进度。
 
-目前的实际测试设备是 **小米 Mi 10 / Android 11**，配合 **iPhone 16 Pro Max / iOS 18.7.8**。当前成功使用的连接方式是 Android 手机个人热点；Wi-Fi Direct 在这套设备上仍未解决。其他手机组合需要各自验证。
+本分支为 `xmz28/DiPlay-Phone` 的 `research/android-baseline`，基于 [ZedingZhang 的手机适配版](https://github.com/ZedingZhang/DiPlay-Phone)继续修改。以下说明对应本分支的融合仪表版本。
 
-[下载手机适配版](https://github.com/ZedingZhang/DiPlay-Phone/releases/tag/v0.2.11-phone-fixes.2) · [全部 Release](https://github.com/ZedingZhang/DiPlay-Phone/releases) · [修复记录与讨论](https://github.com/ZedingZhang/DiPlay-Phone/pulls) · [实机复测清单](docs/TESTING.md)
+[下载融合仪表 Debug APK](https://github.com/xmz28/DiPlay-Phone/releases/tag/v0.2.11-fusion-debug.3) · [本仓库全部 Release](https://github.com/xmz28/DiPlay-Phone/releases) · [源码与讨论](https://github.com/xmz28/DiPlay-Phone/pull/1)
 
-## 当前版本
+## 装车反馈修正（Debug 3）
 
-最新预览版为 **`v0.2.11-phone-fixes.2`**，基于上游 v0.2.11，并已同步其发布后的 main 快照 `e6e7cc0eaf175ef397eee7ac6223eb267cdc68bd`。
+新增电量 × 0.85 的估算续航、速度 45 ms / 功率圈 60 ms 的短过渡、VSync 目标 60 Hz 显示、加粗指示灯和正确的 FREE 挡位及配色。BLE 遥测保持 20 Hz，真实数据未变时数字不强制变化。本轮 Android 显示调整兼容 ESP32 v0.1.8，无需重刷 ESP32。[实现与验证说明](docs/ROAD_TEST_DISPLAY_REFINEMENT.zh-CN.md)。
 
-| 项目 | 当前发布包 |
-| --- | --- |
-| APK 文件 | `DiPlay-0.2.11-phone-test.apk` |
-| 应用版本 | `0.2.11-orientation-lock-hud-test` |
-| Android 包名 | `com.shihab.diplay.hudtest` |
-| 版本号 | 30 |
-| 发布源码 | `367aa8414037d718da78ace22eb60cd202b94f61` |
-| 发布形式 | 使用调试签名的手机适配预览版，可与原版 DiPlay 共存 |
+本次 Debug 3 已在红米覆盖安装验证：稳定统计窗口的 Android 仪表前景绘制约 59.8～59.9 FPS，平均绘制记录耗时约 1.8 ms。遥测采样仍为 20 Hz，不能据此宣称外置镜像屏或 CarPlay 地图视频也达到 60 FPS。
 
-仓库名称为 **DiPlay-Phone**；当前 APK 的应用名称、包名和版本标识沿用上述测试包信息。
+## 本分支新增功能
 
-## 已完成的手机适配
+- **融合仪表和真实地图**：仪表页面使用 iPhone 输出的 CarPlay 副屏地图；音乐区读取真实封面、歌名、歌手和播放进度。
+- **主副屏切换**：CarPlay 主屏双指右滑进入仪表，仪表双指左滑返回主屏；也可点击 CarPlay 中的“仪表”入口或仪表音乐区切页。两页共用显示 Activity，保留视频视图挂载。
+- **显示比例与横屏**：支持手机默认布局和六寸仪表 2:1 预设；2:1 内容按物理屏幕居中，兼顾左右刘海，支持两个横屏方向。
+- **日夜主题**：仪表日夜配色及独立地图主题；夜间→日间、日间→夜间可分别设置 0～3 秒过渡。
+- **ESP32 车辆数据**：在设置中选择“车辆数据 · ESP32 BLE”，配对并绑定目标设备，只重连已绑定地址，车辆 BLE 与 CarPlay 链路独立。
+- **功率圆弧**：速度数字外圈按功率变化，驱动为蓝色、回收为绿色；正向满量程 1.4 kW，回收满量程 0.6 kW，超量程钳制。
+- **仪表视觉调整**：自绘状态指示灯、地图边缘渐隐、速度环与底栏布局，改善小屏可读性。
+- **保留手机适配**：紧凑设置页面、显示尺寸设置、方向处理、音乐、诊断和现有连接功能。
 
-- **统一设置界面**：连接前的设置按钮与 CarPlay 内下滑手势进入同一设置页。手势支持两、三或四指，默认三指；保留的高级选项集中在可展开的高级设置中。该设置入口已实机复测通过，见 [PR #8](https://github.com/ZedingZhang/DiPlay-Phone/pull/8)。
-- **手机横屏布局**：首页采用紧凑布局；设置页将较短分组并排；连接设置页将连接方式、热点信息与配对、连接操作分列，减少留白和上下滚动。主要按钮和开关的触控区域至少为 48dp。两页优化已实机复测通过，见 [PR #9](https://github.com/ZedingZhang/DiPlay-Phone/pull/9)。
-- **设置自动旋转，CarPlay 锁定方向**：设置页随手机切换正反横屏或竖屏，CarPlay 固定进入时的方向。打开设置后可以旋转，返回 CarPlay 时恢复原方向并保持会话。完全断开后换一个方向重新连接，才锁定新的方向。该修改已合入 [PR #10](https://github.com/ZedingZhang/DiPlay-Phone/pull/10)，方向、状态恢复及后台尺寸回调的自动回归通过。
-- **CarPlay 尺寸设置实际生效**：大、中、小尺寸选择会改变实际 CarPlay 画面；主动修改尺寸或分辨率并应用时，仍会执行必要的重连。此前已在小米实机复测通过。
-- **非 BYD 设备隐藏 BYD 返回图标**：手机不再显示不适用的 BYD 返回入口。此前已在小米实机复测通过。
-- **Android 11 中文设置适配**：应用语言覆盖仅覆盖语言，避免设置页面的方向、窗口尺寸和字号固定在旧配置。
+支持通过 ESP32 BLE 接收车辆速度、挡位、电量、电压、电流、功率和指示灯。电气数据有效时用电压 × 电流计算功率，保留回收负功率；里程由 ESP32 按速度累计，不是车辆原厂总里程。协议不提供真实续航，本分支按有效电量 × 0.85 显示“估算续航”，电量无效则显示未知。未连接、关闭 BLE 或状态超时 3 秒时恢复演示模式，已连接但无效的字段显示“--”。副屏地图暂不转发触摸，尚未实现完整 CarPlay Ultra 协议。
 
-本版还保留上游的画面调整、昼夜模式、分辨率、系统栏、音乐信息、诊断导出及 USB 相关功能。上游的 BYD 仪表、车辆数据和车机热点自动化依赖相应车辆与固件，不是手机适配功能，也没有通过本分支的小米测试验证。
+## 配套 ESP32 项目
+
+本项目可与 [ESP32 Vehicle Dashboard](https://github.com/xmz28/esp32-vehicle-dashboard) 配套使用：ESP32 采集 CAN／RS485 车辆数据，经 BLE 传给 Android 融合仪表；地图和音乐继续由 CarPlay 提供。ESP32 固件、硬件接线及用户资料见关联仓库，ESP32 程序源码不公开。
+
+本次配套 [ESP32 固件 v0.1.8](https://github.com/xmz28/esp32-vehicle-dashboard/releases/tag/v0.1.8)。公开旧固件 v0.1.5 不作为本次 BLE 配套版本；较旧 BLE 固件缺少电压、电流扩展时，手机可回退显示旧功率，电压和电流显示“--”。详细步骤见 [车辆 BLE 接入说明](docs/VEHICLE_BLE_INTEGRATION.zh-CN.md)。
 
 ## 下载与安装
 
-1. 从 [当前 Release](https://github.com/ZedingZhang/DiPlay-Phone/releases/tag/v0.2.11-phone-fixes.2) 下载 **[DiPlay-0.2.11-phone-test.apk](https://github.com/ZedingZhang/DiPlay-Phone/releases/download/v0.2.11-phone-fixes.2/DiPlay-0.2.11-phone-test.apk)**，安装到 **Android 手机**上。
-2. 当前 Release 的 APK 与 PR #10 最后交付的 `DiPlay-0.2.11-orientation-lock-test.apk` 内容完全相同，仅下载文件名不同。已经安装该测试包的设备无需重新安装。
-3. 从旧 Release 或其他调试签名的 HUD Test 包升级时，请先记录热点及其他设置，卸载旧的 **DiPlay HUD Test** 后安装新包。卸载会清除测试应用的数据。相同签名的覆盖安装可以保留设置。
-4. 详细步骤见 Release 附件 `INSTALL.zh-CN.txt`；校验值见 `SHA256SUMS.txt`，源码及签名来源见 `SOURCE.txt`。
+从[本分支 Release](https://github.com/xmz28/DiPlay-Phone/releases/tag/v0.2.11-fusion-debug.3) 下载 `DiPlay-fusion-ble-debug.apk`，安装到 Android 手机上。发布的是带运行时认证资源的 **debug APK，使用本机 debug 签名**。
 
-当前 APK SHA-256：
+| 项目 | 本次融合仪表 Debug 包 |
+| --- | --- |
+| Release 标签 | `v0.2.11-fusion-debug.3` |
+| Android 包名 | `com.shihab.diplay.hudtest` |
+| APK 内版本名 | `0.2.11-fusion-ble-debug.3` |
+| versionCode | `32` |
+| 构建类型 | debug |
+| 校验和及源码提交 | Release 附件 `SHA256SUMS.txt`、`SOURCE.txt` |
 
-```text
-f42ace8b25e64b63adbe54aa67c8249b8fddb83930d6dc2ec5606a5e9e70bd25
-```
+相同包名和签名可以覆盖安装；如果系统提示签名冲突，先记录设置，卸载旧包再安装，卸载会清除应用数据。安装完成后进入“CarPlay 主屏”或“融合仪表 · 演示”。
 
-## 在手机上连接
+ZedingZhang 的 [`v0.2.11-phone-fixes.2`](https://github.com/ZedingZhang/DiPlay-Phone/releases/tag/v0.2.11-phone-fixes.2) 是本分支使用的基础手机适配版本，**不包含这里新增的融合仪表功能**。
 
-优先使用此前已成功的 **Android 手机个人热点**方式：
+## 连接与使用
 
-1. 打开 Android 手机蓝牙和个人热点；设备支持时可选择 5 GHz。
-2. 在 DiPlay 的连接设置中选择当前仍标为“车载热点”的连接方式，填写或确认这台 Android 手机的热点名称、密码等信息。
-3. 保持 iPhone 的 Wi-Fi 和蓝牙开启，在提示出现时允许使用 CarPlay，然后在 DiPlay 中连接手机。
-4. 连接后检查画面、触控和音乐。CarPlay 内默认通过三指下滑打开设置。
+1. 开启 Android 手机蓝牙和个人热点；设备支持时可选择 5 GHz。
+2. 在 DiPlay 的连接设置中选择仍标为“车载热点”的连接方式，填写这台 Android 手机的热点名称和密码。
+3. 保持 iPhone 的 Wi-Fi 和蓝牙开启，允许使用 CarPlay，完成配对与连接。
+4. 连接后检查画面、音乐、主副屏切换和设置返回；默认三指下滑打开设置。
 
-手机使用不需要启用 BYD 高级车辆数据或车机热点自动化。USB 入口仍保留；上述手机组合的 USB 连接尚无实机验证记录。
+手机使用不需要开启 BYD 高级车辆数据或车机热点自动化。Wi-Fi Direct 的手机兼容性仍需逐设备验证；基础版在小米 Mi 10 / Android 11 上的 Wi-Fi Direct 问题尚未解决，不宣称本分支已修复。
 
-## Wi-Fi Direct 的实际状态
+## 验证范围
 
-**仍未解决，当前不建议将它作为这套测试设备的首选连接方式。**
+融合仪表研究记录使用 **Redmi K30 5G / Android 13**，配合 **iPhone 15 Pro / iOS 26.7**；已验证真实副屏地图、歌曲封面与进度、2:1 布局及双向横屏。具体实机记录见下方文档。基础版的小米测试与本分支红米测试分别记录，不等同于所有手机或车辆面板通过验收。
 
-在小米 Mi 10 / Android 11 与 iPhone 16 Pro Max / iOS 18.7.8 的测试中，iPhone 可以看到并手动加入 DIRECT 网络，但网络检测页无法打开，CarPlay 没有画面。关闭 iPhone 的 VPN 后，检测页仍无法打开。
+2026-10-15 的车辆协议、BLE 分片/超时、功率圈、分方向主题、显示缓冲和显示预设共 36 项定向测试通过。此前板端演示联调验证包含正负电流、计算功率及 ESP32 复位重连。用户随后已装车试用并反馈，本次据此修正续航显示、跳变、图标和挡位；远程验证不替代车辆传感器精度、长期稳定性与强光可视性验收。完整测试套件尚未完成；不沿用基础版 932 项测试结果作为本分支结果。本次 mobile lint 与 standalone debug 构建通过，lint 为 18 个警告、无错误；APK 签名与上一融合仪表版本一致，认证资源及 ARM64 库校验通过。完整结果见 Release 说明。
 
-[PR #6](https://github.com/ZedingZhang/DiPlay-Phone/pull/6) 的专项连接、恢复和诊断修改已搁置，**没有合入 main，也没有包含在当前 Release 中**。已同步的上游首选信道等更新不能据此视为该问题已修复。
+## 文档
 
-## 验证与问题反馈
+- [车辆 BLE 接入与字段有效性](docs/VEHICLE_BLE_INTEGRATION.zh-CN.md)
+- [功率圆弧与分方向过渡](docs/POWER_RING_AND_DIRECTIONAL_THEME.zh-CN.md)
+- [研究环境与本机构建](docs/RESEARCH.zh-CN.md)
+- [融合仪表功能与限制](docs/FUSION_DASHBOARD.zh-CN.md)
+- [主副屏切换与显示适配](docs/DISPLAY_SWITCHING.zh-CN.md)
+- [2:1 预设、音乐与实机验证](docs/FUSION_CLUSTER_PRESET_AND_MEDIA.zh-CN.md)
+- [日夜主题与指示灯](docs/DASHBOARD_THEME_AND_INDICATORS.zh-CN.md)
+- [独立地图主题与布局](docs/DASHBOARD_LAYOUT_AND_INDEPENDENT_MAP_THEME.zh-CN.md)
+- [仪表视觉精修](docs/DASHBOARD_VISUAL_REFINEMENT.zh-CN.md)
+- [连接原理](docs/CARPLAY_WIRELESS_PROTOCOL.zh-CN.md)
+- [通用构建说明](docs/BUILD.md)
 
-当前发布源码对应的 [Android 检查](https://github.com/ZedingZhang/DiPlay-Phone/actions/runs/37219976820) 共 **932 项测试全部通过，零失败、零跳过**；mobile、home、maphost 的 Lint 和源码构建均通过。[独立 APK 构建](https://github.com/ZedingZhang/DiPlay-Phone/actions/runs/37219975687) 已核对包名、版本、签名、ARM64、运行资源及编译后的方向配置。
+普通源码/CI 构建不含运行时认证资源；本机独立连接构建通过外部目录显式提供资源。诊断报告由用户选择分享，分享前检查并移除热点密码等个人信息。
 
-自动测试验证代码行为，实机状态按上面的各项记录分别说明。请在自己的设备上检查连接、显示、触控、音乐，以及旋转和设置返回行为；复测步骤见 [docs/TESTING.md](docs/TESTING.md)。
+## 来源与许可
 
-复现问题后，进入 **设置 → 诊断 → 保存诊断报告**。Android 10 及以上保存到 **Downloads/DiPlay**。反馈时附上 Android 手机型号及系统、iPhone 型号及 iOS、应用版本、连接方式、复现步骤和失败时间；旋转问题还应说明当时的页面及旋转前后的方向。请先检查日志内容，移除不希望公开的信息和热点密码。报告不会自动上传。
+本分支基于 [ZedingZhang/DiPlay-Phone](https://github.com/ZedingZhang/DiPlay-Phone)，其基础来自 [DiPlay](https://github.com/shihabal3amri/DiPlay) 和 [xcertplay](https://github.com/shilapi/xcertplay)。保留 GPLv3、DiAuto 相关 AGPLv3 及各第三方素材声明；BYD HUD 图标包含单独的非商业许可。详见 [LICENSE](LICENSE) 和 [第三方声明](docs/THIRD_PARTY_NOTICES.md)。
 
-仓库当前未启用 Issues，可在已有的 [修复 PR 讨论](https://github.com/ZedingZhang/DiPlay-Phone/pulls) 中反馈相关问题。
-
-## 源码、构建与上游
-
-- [上游 DiPlay](https://github.com/shihabal3amri/DiPlay)：本分支的直接基础，原项目主要面向 BYD 安卓车机。
-- [构建说明](docs/BUILD.md)：普通源码／CI 构建默认不包含运行时认证资源；需要连接 iPhone 的独立 APK 使用明确提供的外部运行资源。
-- [源码与第三方许可](docs/THIRD_PARTY_NOTICES.md)：接收端基于 [xcertplay](https://github.com/shilapi/xcertplay)，使用 GPL-3.0；部分首页、设置和网站内容改编自 [DiAuto](https://github.com/shihabal3amri/DiAuto)，相关 AGPL-3.0 声明保留在源码及 `docs/licenses` 中。
-- [隐私与诊断说明](docs/PRIVACY.md)。
-
-日志、用户截图、运行时认证文件和 Android 签名密钥不提交到源码仓库。发布 APK 沿用上游公开 v0.2.11 包的实验性配件身份；本项目未经 Apple 认证。CarPlay 及其图标属于 Apple Inc.，项目不代表 Apple 或 BYD。
+CarPlay 及其图标属于 Apple Inc.；本项目未经 Apple 认证。APK 使用既有实验性配件身份，Android debug 签名与配件身份是两套独立机制。Android 签名密钥、独立认证文件、私有参考图片和本机支持目录不进入源码仓库，APK 作为 Release 附件提供。

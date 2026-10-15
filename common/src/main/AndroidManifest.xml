@@ -22,7 +22,17 @@
             <category android:name="android.intent.category.HOME" />
         </intent>
     </queries>
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <application>
+        <service android:name="com.shilapi.xcertplay.vehicle.VehicleBleService" android:exported="false" android:foregroundServiceType="connectedDevice" />
+        <activity android:name="com.shilapi.xcertplay.FusionDashboardActivity"
+            android:exported="false" android:screenOrientation="landscape"
+            android:theme="@style/Theme.Xcertplay" />
+        <activity android:name="com.shilapi.xcertplay.ClusterMapTestActivity"
+            android:exported="false" android:screenOrientation="landscape"
+            android:theme="@style/Theme.Xcertplay" />
         <provider
             android:name="com.shilapi.xcertplay.DiagnosticReportProvider"
             android:authorities="${applicationId}.diagnostic-reports"

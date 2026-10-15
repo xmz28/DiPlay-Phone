@@ -2,6 +2,7 @@
 // UI copy and visual language adapted from DiAuto. See docs/THIRD_PARTY_NOTICES.md.
 package com.shilapi.xcertplay
 
+import com.shilapi.xcertplay.vehicle.*
 import android.Manifest
 import android.app.AlertDialog
 import android.bluetooth.BluetoothManager
@@ -143,6 +144,21 @@ class DiPlayActivity : ComponentActivity() {
     private val tick = object : Runnable {
         override fun run() { refreshStatus(); handler.postDelayed(this, 1000) }
     }
+    private val vehicleBlePermission = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        if (VehicleBleSettings.hasPermissions(this)) chooseVehicleBle()
+        else { toast("请允许附近设备权限后再连接车辆"); render() }
+    }
+    private fun chooseVehicleBle() {
+        if (!VehicleBleSettings.hasPermissions(this)) {
+            vehicleBlePermission.launch(VehicleBleSettings.permissions())
+            return
+        }
+        VehicleBlePicker.show(this) { address ->
+            Esp32VehicleBleClient.getInstance(this).bindDevice(address)
+            VehicleBleSettings.setEnabled(this, true)
+            render()
+        }
+    }
     private val bluetoothPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) choosePhone() else permissionHelp(getString(R.string.nearby_devices), getString(R.string.allow_nearby_devices_so_diplay_can_connect_to_your_paired))
     }
@@ -192,9 +208,11 @@ class DiPlayActivity : ComponentActivity() {
         bydVehicleAdvancedExpanded = savedInstanceState?.getBoolean("byd_vehicle_advanced") ?: false
         advancedSettingsExpanded = savedInstanceState?.getBoolean("advanced_settings") ?: false
         page = savedInstanceState?.getString("page") ?: intent.getStringExtra("page") ?: "home"
+        VehicleBleSettings.resume(this)
         render()
         scheduleAutomaticVehicleValidation()
         handleWirelessRecovery()
+        handleClusterTestIntent()
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 if (page != "home") { page = "home"; render() }
@@ -209,6 +227,32 @@ class DiPlayActivity : ComponentActivity() {
         automaticVehicleValidationStarted = false
         scheduleAutomaticVehicleValidation()
         handleWirelessRecovery()
+        handleClusterTestIntent()
+    }
+    private fun handleClusterTestIntent() {
+        if (intent.getBooleanExtra("fusion_dashboard", false)) {
+            intent.removeExtra("fusion_dashboard")
+            openFusionDashboard()
+        } else if (intent.getBooleanExtra("cluster_test_reconnect", false)) {
+            intent.removeExtra("cluster_test_reconnect")
+            AirPlayPersistence.saveClusterMapEnabled(this, true)
+            connect(AirPlayPersistence.loadWirelessEnabled(this))
+        } else if (intent.getBooleanExtra("cluster_test", false)) {
+            intent.removeExtra("cluster_test")
+            startActivity(Intent(this, ClusterMapTestActivity::class.java))
+        }
+    }
+    private fun openFusionDashboard() {
+        if (!AirPlayPersistence.loadClusterMapEnabled(this)) {
+            AirPlayPersistence.saveClusterMapEnabled(this, true)
+            if (CarPlayBackgroundSession.hasSession()) {
+                toast("已启用副屏地图，重新连接后再打开融合仪表")
+                connect(AirPlayPersistence.loadWirelessEnabled(this))
+                return
+            }
+        }
+        startActivity(Intent(this, CarPlayHostActivity::class.java).putExtra("display_page", "fusion")
+            .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
     }
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putString("page", page)
@@ -350,6 +394,10 @@ class DiPlayActivity : ComponentActivity() {
     }
 
     private fun home(content: LinearLayout) {
+        content.addView(button("CarPlay 主屏", false) { openProjection() })
+        content.addView(button("融合仪表 · 演示", false) {
+            openFusionDashboard()
+        })
         if (isCompactLayout) {
             compactHome(content)
             return
@@ -488,6 +536,31 @@ class DiPlayActivity : ComponentActivity() {
         content.addView(label(getString(R.string.apply_reconnects_carplay_for_size_resolution_music_buffer), 17, MUTED).apply {
             setPadding(0, dp(if (compactSettings) 0 else 8), 0, dp(if (compactSettings) 10 else 24))
         })
+        section(content, "融合仪表显示", R.drawable.ic_dp_display) { card ->
+            choice(card, "显示比例预设", FusionDisplayPreset.entries.map { it.label },
+                FusionDisplayPreset.load(this).ordinal, reconnects = false) {
+                FusionDisplayPreset.save(this, FusionDisplayPreset.entries[it])
+            }
+            for (toNight in listOf(false, true)) {
+                val title = if (toNight) "日间 → 夜间过渡时长" else "夜间 → 日间过渡时长"
+                card.addView(overlaySliderRow(title, (0..30).map { it * 100 }, FusionThemeSettings.duration(this, toNight)) {
+                    if (it == 0) "0 秒 · 立即切换" else "${it / 1000.0} 秒"
+                }.apply { onSave = { FusionThemeSettings.saveDuration(this@DiPlayActivity, toNight, it) } })
+            }
+            card.addView(label("夜→日默认 1.2 秒，日→夜默认 1.6 秒；分别在 0～3 秒间调节。本地仪表跟随对应时长，地图动画由 iPhone 决定。", 14, MUTED))
+            card.addView(label("2:1 按完整手机屏幕居中，适合镜像到 960×480 仪表。未连接车辆 BLE 时使用演示数据。", 14, MUTED))
+        }
+        section(content, "车辆数据 · ESP32 BLE", R.drawable.ic_dp_connection) { card ->
+            toggle(card, "连接车辆数据", "断连或 3 秒无数据时恢复演示；只连接已选定车辆。", VehicleBleSettings.enabled(this)) { enabled ->
+                if (enabled && (!VehicleBleSettings.hasPermissions(this) || !Esp32VehicleBleClient.hasSavedDevice(this))) chooseVehicleBle()
+                else { VehicleBleSettings.setEnabled(this, enabled); render() }
+            }
+            card.addView(button("选择车辆 ESP32", false) { chooseVehicleBle() }, matchButton(10, 56))
+            val state = Esp32VehicleBleClient.getInstance(this).snapshot()
+            val status = if (state.connectionStatus == ConnectionStatus.CONNECTED) "已收到车辆数据" else "演示状态 · 未收到车辆数据"
+            card.addView(label("$status\n已绑定：${VehicleBleSettings.address(this) ?: "未选择"}", 14, MUTED))
+            card.addView(label("20 Hz 刷新；新固件提供 0.1 V / 0.1 A，功率优先在手机计算。旧固件仍可显示原功率。", 14, MUTED))
+        }
         section(content, getString(R.string.carplay_controls), R.drawable.ic_dp_display) { card ->
             val gestureFingers = listOf(2, 3, 4)
             choice(card, getString(R.string.settings_gesture_fingers_label),
@@ -556,6 +629,9 @@ class DiPlayActivity : ComponentActivity() {
                 setPadding(0, 0, 0, dp(18))
             })
             ambientLightThresholdControl(card)
+            card.addView(button("副屏地图验证（实验）", false) {
+                startActivity(Intent(this, ClusterMapTestActivity::class.java))
+            })
             nightDelaySettingControl(card, R.string.ambient_delay_title, R.string.ambient_delay_hint,
                 0..60, 2, R.string.ambient_delay_summary, { AirPlayPersistence.loadAmbientDelaySeconds(this) },
                 save = { AirPlayPersistence.saveAmbientDelaySeconds(this, it) })
@@ -829,9 +905,13 @@ class DiPlayActivity : ComponentActivity() {
             textSetting(card, R.string.model, { AirPlayPersistence.loadModel(this) }) {
                 AirPlayPersistence.saveModel(this, it)
             }
-            // OEM customization cannot turn the BYD tile back on for an ordinary phone.
-            if (Build.MANUFACTURER.startsWith("BYD", true) || Build.BRAND.startsWith("BYD", true) ||
-                Build.FINGERPRINT.startsWith("BYD-AUTO/", true) || BydOutputSettings.navigationAvailable(this)) {
+            toggle(card, getString(R.string.native_home_title), getString(R.string.native_home_hint),
+                AirPlayPersistence.loadNativeHomeEnabled(this)) {
+                AirPlayPersistence.saveNativeHomeEnabled(this, it)
+                render()
+                reconnectAfterSettingChange()
+            }
+            if (AirPlayPersistence.loadNativeHomeEnabled(this)) {
                 textSetting(card, R.string.oem_label, { AirPlayPersistence.loadOemLabel(this) }) {
                     AirPlayPersistence.saveOemLabel(this, it)
                 }
@@ -2492,7 +2572,7 @@ class DiPlayActivity : ComponentActivity() {
         else open()
     }
     private fun openProjection() {
-        startActivity(Intent(this, CarPlayHostActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
+        startActivity(Intent(this, CarPlayHostActivity::class.java).putExtra("display_page", "main").addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
     }
     private fun choosePhone() {
         if (Build.VERSION.SDK_INT >= 31 && checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {

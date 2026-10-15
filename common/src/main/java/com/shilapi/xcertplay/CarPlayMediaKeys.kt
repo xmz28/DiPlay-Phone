@@ -56,6 +56,16 @@ internal object CarPlayMediaKeys {
     private var artwork: Bitmap? = null
     private val artworkCache = LinkedHashMap<Int, Bitmap?>()
 
+    data class DashboardMedia(val info: CarPlayNowPlaying, val artwork: Bitmap?)
+    @Synchronized fun dashboardSnapshot(): DashboardMedia {
+        val position = nowPlaying.elapsedMillis?.let { base ->
+            val elapsed = if (nowPlaying.playing && elapsedUpdatedAt > 0) SystemClock.elapsedRealtime() - elapsedUpdatedAt else 0L
+            (base + elapsed).coerceAtLeast(0L).let { if (nowPlaying.durationMillis != null) it.coerceAtMost(nowPlaying.durationMillis!!.coerceAtLeast(0L)) else it }
+        }
+        return DashboardMedia(nowPlaying.copy(elapsedMillis = position), artwork)
+    }
+
+
     @Synchronized
     fun attach(context: Context, next: CarPlayController) {
         if (controller !== next) {
